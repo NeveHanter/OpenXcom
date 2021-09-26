@@ -4452,11 +4452,35 @@ bool BattleUnit::hasInventory() const
  * If this unit is breathing, what frame should be displayed?
  * @return frame number.
  */
-int BattleUnit::getBreathFrame() const
+int BattleUnit::getBreathExhaleFrame() const
 {
-	if (_floorAbove)
-		return 0;
-	return _breathFrame;
+	if (_breathing)
+	{
+		auto frame = _breathFrame - BUBBLES_FIRST_FRAME;
+		if (frame >= 0)
+		{
+			return frame;
+		}
+	}
+
+	return -1;
+}
+
+/**
+ * Count frames to next start of breath animation.
+ */
+int BattleUnit::getBreathInhaleFrame() const
+{
+	if (_breathing)
+	{
+		auto frame = BUBBLES_FIRST_FRAME - _breathFrame;
+		if (frame >= 0)
+		{
+			return frame;
+		}
+	}
+
+	return -1;
 }
 
 /**
@@ -4465,17 +4489,25 @@ int BattleUnit::getBreathFrame() const
 void BattleUnit::breathe()
 {
 	// _breathFrame of -1 means this unit doesn't produce bubbles
-	if (_breathFrame < 0 || isOut())
+	if (_breathFrame < 0)
 	{
 		_breathing = false;
 		return;
 	}
 
-	if (!_breathing || _status == STATUS_WALKING)
+	// moving or knock out do not breathe, even when still alive :)
+	if (isOut() || _status == STATUS_WALKING)
+	{
+		_breathing = false;
+		_breathFrame = 0;
+		return;
+	}
+
+	if (!_breathing)
 	{
 		// deviation from original: TFTD used a static 10% chance for every animation frame,
 		// instead let's use 5%, but allow morale to affect it.
-		_breathing = (_status != STATUS_WALKING && RNG::seedless(0, 99) < (105 - _morale));
+		_breathing = RNG::seedless(0, 99) < (105 - _morale);
 		_breathFrame = 0;
 	}
 
@@ -4485,7 +4517,7 @@ void BattleUnit::breathe()
 		_breathFrame++;
 
 		// we've reached the end of the cycle, get rid of the bubbles
-		if (_breathFrame >= 17)
+		if (_breathFrame > BUBBLES_LAST_FRAME)
 		{
 			_breathFrame = 0;
 			_breathing = false;
@@ -5730,8 +5762,12 @@ void BattleUnit::ScriptRegister(ScriptParserBase* parser)
 	bu.add<&isFlyingScript>("isFlying");
 	bu.add<&isCollapsingScript>("isCollapsing");
 	bu.add<&isAimingScript>("isAiming");
+	bu.add<&BattleUnit::isFearable>("isFearable");
+	bu.add<&BattleUnit::isWoundable>("isWoundable");
 	bu.add<&getReactionScoreScript>("getReactionScore");
 	bu.add<&BattleUnit::getDirection>("getDirection");
+	bu.add<&BattleUnit::getIntelligence>("getIntelligence");
+	bu.add<&BattleUnit::getAggression>("getAggression");
 	bu.add<&BattleUnit::getTurretDirection>("getTurretDirection");
 	bu.add<&BattleUnit::getWalkingPhase>("getWalkingPhase");
 	bu.add<&BattleUnit::disableIndicators>("disableIndicators");
@@ -5946,6 +5982,16 @@ void medikitBattleActionImpl(BindBase& b)
 	b.addCustomConst("medikit_action_painkiller", BMA_PAINKILLER);
 }
 
+void commonBattleUnitAnimations(ScriptParserBase* parser)
+{
+	Bind<BattleUnit> bu = { parser, BindBase::ExtensionBinding{} };
+
+	bu.add<&BattleUnit::getFloorAbove>("isFloorAbove", "check if floor is show above unit");
+	bu.add<&BattleUnit::getBreathExhaleFrame>("getBreathExhaleFrame", "return aninmation frame of breath bubbles, -1 mean no animation");
+	bu.add<&BattleUnit::getBreathInhaleFrame>("getBreathInhaleFrame", "return number of frames to next breath animation start, 0 mean animation started, -1 no animation");
+}
+
+
 }
 
 /**
@@ -5958,6 +6004,7 @@ ModScript::RecolorUnitParser::RecolorUnitParser(ScriptGlobal* shared, const std:
 	b.addCustomFunc<burnShadeScript>("add_burn_shade");
 
 	commonImpl(b, mod);
+	commonBattleUnitAnimations(this);
 
 	b.addCustomConst("blit_item_righthand", BODYPART_ITEM_RIGHTHAND);
 	b.addCustomConst("blit_item_lefthand", BODYPART_ITEM_LEFTHAND);
@@ -5975,6 +6022,7 @@ ModScript::SelectUnitParser::SelectUnitParser(ScriptGlobal* shared, const std::s
 	BindBase b { this };
 
 	commonImpl(b, mod);
+	commonBattleUnitAnimations(this);
 
 	setDefault("add sprite_index sprite_offset; return sprite_index;");
 }
@@ -5991,6 +6039,7 @@ ModScript::SelectMoveSoundUnitParser::SelectMoveSoundUnitParser(ScriptGlobal* sh
 	BindBase b { this };
 
 	commonImpl(b, mod);
+	commonBattleUnitAnimations(this);
 
 	moveTypesImpl(b);
 }
