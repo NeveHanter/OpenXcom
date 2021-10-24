@@ -165,6 +165,21 @@ BattleUnit::BattleUnit(const Mod *mod, Soldier *soldier, int depth) :
 	_maxArmor[SIDE_RIGHT] = _armor->getRightSideArmor();
 	_maxArmor[SIDE_REAR] = _armor->getRearArmor();
 	_maxArmor[SIDE_UNDER] = _armor->getUnderArmor();
+	{
+		for (auto bonusRule : *soldier->getBonuses(nullptr))
+		{
+			_maxArmor[SIDE_FRONT] += bonusRule->getFrontArmor();
+			_maxArmor[SIDE_LEFT]  += bonusRule->getLeftSideArmor();
+			_maxArmor[SIDE_RIGHT] += bonusRule->getRightSideArmor();
+			_maxArmor[SIDE_REAR]  += bonusRule->getRearArmor();
+			_maxArmor[SIDE_UNDER] += bonusRule->getUnderArmor();
+		}
+		_maxArmor[SIDE_FRONT] = std::max(0, _maxArmor[SIDE_FRONT]);
+		_maxArmor[SIDE_LEFT]  = std::max(0, _maxArmor[SIDE_LEFT]);
+		_maxArmor[SIDE_RIGHT] = std::max(0, _maxArmor[SIDE_RIGHT]);
+		_maxArmor[SIDE_REAR]  = std::max(0, _maxArmor[SIDE_REAR]);
+		_maxArmor[SIDE_UNDER] = std::max(0, _maxArmor[SIDE_UNDER]);
+	}
 	_currentArmor[SIDE_FRONT] = _maxArmor[SIDE_FRONT];
 	_currentArmor[SIDE_LEFT] = _maxArmor[SIDE_LEFT];
 	_currentArmor[SIDE_RIGHT] = _maxArmor[SIDE_RIGHT];
@@ -239,6 +254,21 @@ void BattleUnit::updateArmorFromSoldier(const Mod *mod, Soldier *soldier, Armor 
 	_maxArmor[SIDE_RIGHT] = _armor->getRightSideArmor();
 	_maxArmor[SIDE_REAR] = _armor->getRearArmor();
 	_maxArmor[SIDE_UNDER] = _armor->getUnderArmor();
+	{
+		for (auto bonusRule : *soldier->getBonuses(nullptr))
+		{
+			_maxArmor[SIDE_FRONT] += bonusRule->getFrontArmor();
+			_maxArmor[SIDE_LEFT]  += bonusRule->getLeftSideArmor();
+			_maxArmor[SIDE_RIGHT] += bonusRule->getRightSideArmor();
+			_maxArmor[SIDE_REAR]  += bonusRule->getRearArmor();
+			_maxArmor[SIDE_UNDER] += bonusRule->getUnderArmor();
+		}
+		_maxArmor[SIDE_FRONT] = std::max(0, _maxArmor[SIDE_FRONT]);
+		_maxArmor[SIDE_LEFT]  = std::max(0, _maxArmor[SIDE_LEFT]);
+		_maxArmor[SIDE_RIGHT] = std::max(0, _maxArmor[SIDE_RIGHT]);
+		_maxArmor[SIDE_REAR]  = std::max(0, _maxArmor[SIDE_REAR]);
+		_maxArmor[SIDE_UNDER] = std::max(0, _maxArmor[SIDE_UNDER]);
+	}
 	_currentArmor[SIDE_FRONT] = _maxArmor[SIDE_FRONT];
 	_currentArmor[SIDE_LEFT] = _maxArmor[SIDE_LEFT];
 	_currentArmor[SIDE_RIGHT] = _maxArmor[SIDE_RIGHT];
@@ -5547,6 +5577,16 @@ void getFactionScript(const BattleUnit *bu, int &faction)
 	faction = 0;
 }
 
+void getOriginalFactionScript(const BattleUnit *bu, int &faction)
+{
+	if (bu)
+	{
+		faction = (int)bu->getOriginalFaction();
+		return;
+	}
+	faction = 0;
+}
+
 
 void setSpawnUnitScript(BattleUnit *bu, const Unit* unitType)
 {
@@ -5780,8 +5820,8 @@ void BattleUnit::ScriptRegister(ScriptParserBase* parser)
 	bu.add<&getSpawnUnitScript>("getSpawnUnit", "get type of zombie will be spawn from curret unit");
 	bu.add<&setSpawnUnitInstantRespawnScript>("setSpawnUnitInstantRespawn", "set 1 to make unit instalty change to spawn zombie unit, other wise it will transform on death");
 	bu.add<&getSpawnUnitInstantRespawnScript>("getSpawnUnitInstantRespawn", "get state of instant respawn");
-	bu.add<&setSpawnUnitFactionScript>("setSpawnUnitFaction", "set faction of unit that will span");
-	bu.add<&getSpawnUnitFactionScript>("getSpawnUnitFaction", "get faction of unit that will span");
+	bu.add<&setSpawnUnitFactionScript>("setSpawnUnitFaction", "set faction of unit that will spawn");
+	bu.add<&getSpawnUnitFactionScript>("getSpawnUnitFaction", "get faction of unit that will spawn");
 
 
 	bu.addField<&BattleUnit::_tu>("getTimeUnits");
@@ -5836,7 +5876,8 @@ void BattleUnit::ScriptRegister(ScriptParserBase* parser)
 	UnitStats::addGetStatsScript<&BattleUnit::_exp>(bu, "Exp.", true);
 
 	bu.add<&getVisibleUnitsCountScript>("getVisibleUnitsCount");
-	bu.add<&getFactionScript>("getFaction");
+	bu.add<&getFactionScript>("getFaction", "get current faction of unit");
+	bu.add<&getOriginalFactionScript>("getOriginalFaction", "get original faction of unit");
 
 	bu.add<&BattleUnit::getOverKillDamage>("getOverKillDamage");
 	bu.addRules<Armor, &BattleUnit::getArmor>("getRuleArmor");
