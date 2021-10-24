@@ -17,6 +17,7 @@
  * along with OpenXcom.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "GeoscapeState.h"
+#include <set>
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
@@ -3338,6 +3339,22 @@ void GeoscapeState::determineAlienMissions()
 	std::vector<RuleMissionScript*> availableMissions;
 	std::map<int, bool> conditions;
 
+	std::set<std::string> xcomBaseRegions;
+	std::set<std::string> xcomBaseCountries;
+	for (auto& xcomBase : *save->getBases())
+	{
+		auto region = save->locateRegion(*xcomBase);
+		if (region)
+		{
+			xcomBaseRegions.insert(region->getRules()->getType());
+		}
+		auto country = save->locateCountry(*xcomBase);
+		if (country)
+		{
+			xcomBaseCountries.insert(country->getRules()->getType());
+		}
+	}
+
 	// sorry to interrupt, but before we start determining the actual monthly missions, let's determine and/or adjust our overall game plan
 	{
 		std::vector<RuleArcScript*> relevantArcScripts;
@@ -3382,6 +3399,28 @@ void GeoscapeState::determineAlienMissions()
 					for (auto &triggerFacility : arcScript->getFacilityTriggers())
 					{
 						triggerHappy = (save->isFacilityBuilt(triggerFacility.first) == triggerFacility.second);
+						if (!triggerHappy)
+							break;
+					}
+				}
+				if (triggerHappy)
+				{
+					// xcom base requirements
+					for (auto& triggerXcomBase : arcScript->getXcomBaseInRegionTriggers())
+					{
+						bool found = (xcomBaseRegions.find(triggerXcomBase.first) != xcomBaseRegions.end());
+						triggerHappy = (found == triggerXcomBase.second);
+						if (!triggerHappy)
+							break;
+					}
+				}
+				if (triggerHappy)
+				{
+					// xcom base requirements by country
+					for (auto& triggerXcomBase2 : arcScript->getXcomBaseInCountryTriggers())
+					{
+						bool found = (xcomBaseCountries.find(triggerXcomBase2.first) != xcomBaseCountries.end());
+						triggerHappy = (found == triggerXcomBase2.second);
 						if (!triggerHappy)
 							break;
 					}
@@ -3509,6 +3548,28 @@ void GeoscapeState::determineAlienMissions()
 						break;
 				}
 			}
+			if (triggerHappy)
+			{
+				// xcom base requirements
+				for (auto& triggerXcomBase : command->getXcomBaseInRegionTriggers())
+				{
+					bool found = (xcomBaseRegions.find(triggerXcomBase.first) != xcomBaseRegions.end());
+					triggerHappy = (found == triggerXcomBase.second);
+					if (!triggerHappy)
+						break;
+				}
+			}
+			if (triggerHappy)
+			{
+				// xcom base requirements by country
+				for (auto& triggerXcomBase2 : command->getXcomBaseInCountryTriggers())
+				{
+					bool found = (xcomBaseCountries.find(triggerXcomBase2.first) != xcomBaseCountries.end());
+					triggerHappy = (found == triggerXcomBase2.second);
+					if (!triggerHappy)
+						break;
+				}
+			}
 			// levels one and two passed: insert this command into the array.
 			if (triggerHappy)
 			{
@@ -3606,6 +3667,28 @@ void GeoscapeState::determineAlienMissions()
 					for (auto &triggerFacility : eventScript->getFacilityTriggers())
 					{
 						triggerHappy = (save->isFacilityBuilt(triggerFacility.first) == triggerFacility.second);
+						if (!triggerHappy)
+							break;
+					}
+				}
+				if (triggerHappy)
+				{
+					// xcom base requirements
+					for (auto& triggerXcomBase : eventScript->getXcomBaseInRegionTriggers())
+					{
+						bool found = (xcomBaseRegions.find(triggerXcomBase.first) != xcomBaseRegions.end());
+						triggerHappy = (found == triggerXcomBase.second);
+						if (!triggerHappy)
+							break;
+					}
+				}
+				if (triggerHappy)
+				{
+					// xcom base requirements by country
+					for (auto& triggerXcomBase2 : eventScript->getXcomBaseInCountryTriggers())
+					{
+						bool found = (xcomBaseCountries.find(triggerXcomBase2.first) != xcomBaseCountries.end());
+						triggerHappy = (found == triggerXcomBase2.second);
 						if (!triggerHappy)
 							break;
 					}
