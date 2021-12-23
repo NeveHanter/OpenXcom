@@ -908,6 +908,14 @@ void Mod::playMusic(const std::string &name, int id)
 		if (music != _muteMusic)
 		{
 			_playingMusic = name;
+			for (auto& item : _musics)
+			{
+				if (item.second == music)
+				{
+					setCurrentMusicTrack(item.first);
+					break;
+				}
+			}
 		}
 		Log(LOG_VERBOSE)<<"Mod::playMusic('" << name << "'): playing " << _playingMusic;
 	}
@@ -2156,6 +2164,10 @@ void Mod::loadMod(const std::vector<FileMap::FileRecord> &rulesetFiles, ModScrip
 		try
 		{
 			loadFile(*i, parsers);
+		}
+		catch (Exception &e)
+		{
+			throw Exception(i->fullpath + ": " + std::string(e.what()));
 		}
 		catch (YAML::Exception &e)
 		{

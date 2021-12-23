@@ -62,7 +62,8 @@ namespace OpenXcom
  */
 TransferItemsState::TransferItemsState(Base *baseFrom, Base *baseTo, DebriefingState *debriefingState) :
 	_baseFrom(baseFrom), _baseTo(baseTo), _debriefingState(debriefingState),
-	_sel(0), _total(0), _pQty(0), _cQty(0), _aQty(0), _iQty(0.0), _distance(0.0), _ammoColor(0)
+	_sel(0), _total(0), _pQty(0), _cQty(0), _aQty(0), _iQty(0.0), _distance(0.0), _ammoColor(0),
+	_previousSort(TransferSortDirection::BY_LIST_ORDER), _currentSort(TransferSortDirection::BY_LIST_ORDER), _errorShown(false)
 {
 	// Create objects
 	_window = new Window(this, 320, 200, 0, 0);
@@ -141,7 +142,7 @@ TransferItemsState::TransferItemsState(Base *baseFrom, Base *baseTo, DebriefingS
 		if (_debriefingState) break;
 		if ((*i)->getCraft() == 0)
 		{
-			TransferRow row = { TRANSFER_SOLDIER, (*i), (*i)->getName(true), (int)(5 * _distance), 1, 0, 0 };
+			TransferRow row = { TRANSFER_SOLDIER, (*i), (*i)->getName(true), (int)(5 * _distance), 1, 0, 0, -4, 0, 0, (int)(5 * _distance) };
 			_items.push_back(row);
 			std::string cat = getCategory(_items.size() - 1);
 			if (std::find(_cats.begin(), _cats.end(), cat) == _cats.end())
@@ -155,7 +156,7 @@ TransferItemsState::TransferItemsState(Base *baseFrom, Base *baseTo, DebriefingS
 		if (_debriefingState) break;
 		if ((*i)->getStatus() != "STR_OUT" || (Options::canTransferCraftsWhileAirborne && (*i)->getFuel() >= (*i)->getFuelLimit(_baseTo)))
 		{
-			TransferRow row = { TRANSFER_CRAFT, (*i), (*i)->getName(_game->getLanguage()),  (int)(25 * _distance), 1, 0, 0 };
+			TransferRow row = { TRANSFER_CRAFT, (*i), (*i)->getName(_game->getLanguage()),  (int)(25 * _distance), 1, 0, 0, -3, 0, 0, (int)(25 * _distance) };
 			_items.push_back(row);
 			std::string cat = getCategory(_items.size() - 1);
 			if (std::find(_cats.begin(), _cats.end(), cat) == _cats.end())
@@ -166,7 +167,7 @@ TransferItemsState::TransferItemsState(Base *baseFrom, Base *baseTo, DebriefingS
 	}
 	if (_baseFrom->getAvailableScientists() > 0 && _debriefingState == 0)
 	{
-		TransferRow row = { TRANSFER_SCIENTIST, 0, tr("STR_SCIENTIST"),  (int)(5 * _distance), _baseFrom->getAvailableScientists(), _baseTo->getAvailableScientists(), 0 };
+		TransferRow row = { TRANSFER_SCIENTIST, 0, tr("STR_SCIENTIST"),  (int)(5 * _distance), _baseFrom->getAvailableScientists(), _baseTo->getAvailableScientists(), 0, -2, 0, 0, _baseFrom->getAvailableScientists() * (int)(5 * _distance) };
 		_items.push_back(row);
 		std::string cat = getCategory(_items.size() - 1);
 		if (std::find(_cats.begin(), _cats.end(), cat) == _cats.end())
@@ -176,7 +177,7 @@ TransferItemsState::TransferItemsState(Base *baseFrom, Base *baseTo, DebriefingS
 	}
 	if (_baseFrom->getAvailableEngineers() > 0 && _debriefingState == 0)
 	{
-		TransferRow row = { TRANSFER_ENGINEER, 0, tr("STR_ENGINEER"),  (int)(5 * _distance), _baseFrom->getAvailableEngineers(), _baseTo->getAvailableEngineers(), 0 };
+		TransferRow row = { TRANSFER_ENGINEER, 0, tr("STR_ENGINEER"),  (int)(5 * _distance), _baseFrom->getAvailableEngineers(), _baseTo->getAvailableEngineers(), 0, -1, 0, 0, _baseFrom->getAvailableEngineers() * (int)(5 * _distance) };
 		_items.push_back(row);
 		std::string cat = getCategory(_items.size() - 1);
 		if (std::find(_cats.begin(), _cats.end(), cat) == _cats.end())
@@ -195,7 +196,7 @@ TransferItemsState::TransferItemsState(Base *baseFrom, Base *baseTo, DebriefingS
 		}
 		if (qty > 0)
 		{
-			TransferRow row = { TRANSFER_ITEM, rule, tr(*i),  (int)(1 * _distance), qty, _baseTo->getStorageItems()->getItem(*i), 0 };
+			TransferRow row = { TRANSFER_ITEM, rule, tr(*i),  (int)(1 * _distance), qty, _baseTo->getStorageItems()->getItem(*i), 0, rule->getListOrder(), rule->getSize(), qty * rule->getSize(), qty * (int)(1 * _distance) };
 			_items.push_back(row);
 			std::string cat = getCategory(_items.size() - 1);
 			if (std::find(_cats.begin(), _cats.end(), cat) == _cats.end())
@@ -254,6 +255,7 @@ TransferItemsState::TransferItemsState(Base *baseFrom, Base *baseTo, DebriefingS
 
 	_cbxCategory->setOptions(_cats, true);
 	_cbxCategory->onChange((ActionHandler)&TransferItemsState::cbxCategoryChange);
+	_cbxCategory->onKeyboardPress((ActionHandler)&TransferItemsState::btnTransferAllClick, Options::keyTransferAll);
 
 	_btnQuickSearch->setText(""); // redraw
 	_btnQuickSearch->onEnter((ActionHandler)&TransferItemsState::btnQuickSearchApply);
@@ -395,6 +397,18 @@ void TransferItemsState::updateList()
 	bool onlyItemsAtDestination = (cat == "STR_ITEMS_AT_DESTINATION");
 	bool categoryUnassigned = (cat == "STR_UNASSIGNED");
 	bool specialCategory = allItems || onlyItemsAtDestination;
+
+	if (_previousSort != _currentSort)
+	{
+		switch (_currentSort)
+		{
+		case TransferSortDirection::BY_TOTAL_COST: std::stable_sort(_items.begin(), _items.end(), [](const TransferRow a, const TransferRow b) { return a.totalCost > b.totalCost; }); break;
+		case TransferSortDirection::BY_UNIT_COST:  std::stable_sort(_items.begin(), _items.end(), [](const TransferRow a, const TransferRow b) { return a.cost > b.cost; }); break;
+		case TransferSortDirection::BY_TOTAL_SIZE: std::stable_sort(_items.begin(), _items.end(), [](const TransferRow a, const TransferRow b) { return a.totalSize > b.totalSize; }); break;
+		case TransferSortDirection::BY_UNIT_SIZE:  std::stable_sort(_items.begin(), _items.end(), [](const TransferRow a, const TransferRow b) { return a.size > b.size; }); break;
+		default:                                   std::stable_sort(_items.begin(), _items.end(), [](const TransferRow a, const TransferRow b) { return a.listOrder < b.listOrder; }); break;
+		}
+	}
 
 	for (size_t i = 0; i < _items.size(); ++i)
 	{
@@ -614,6 +628,39 @@ void TransferItemsState::btnCancelClick(Action *)
 {
 	_game->popState();
 	_game->popState();
+}
+
+/**
+ * Increase all items to max, i.e. transfer everything.
+ * @param action Pointer to an action.
+ */
+void TransferItemsState::btnTransferAllClick(Action *)
+{
+	bool allItemsSelected = true;
+	for (size_t i = 0; i < _lstItems->getTexts(); ++i)
+	{
+		if (_items[_rows[i]].type == TRANSFER_ITEM && _items[_rows[i]].amount < _items[_rows[i]].qtySrc)
+		{
+			allItemsSelected = false;
+			break;
+		}
+	}
+
+	size_t backup = _sel;
+	_errorShown = false;
+	for (size_t i = 0; i < _lstItems->getTexts(); ++i)
+	{
+		if (_items[_rows[i]].type == TRANSFER_ITEM)
+		{
+			_sel = i;
+			allItemsSelected ? decreaseByValue(INT_MAX) : increaseByValue(INT_MAX);
+			if (_errorShown)
+			{
+				break; // stop on first error
+			}
+		}
+	}
+	_sel = backup;
 }
 
 /**
@@ -881,6 +928,7 @@ void TransferItemsState::increaseByValue(int change)
 		_timerInc->stop();
 		RuleInterface *menuInterface = _game->getMod()->getInterface("transferMenu");
 		_game->pushState(new ErrorMessageState(errorMessage, _palette, menuInterface->getElement("errorMessage")->color, "BACK13.SCR", menuInterface->getElement("errorPalette")->color));
+		_errorShown = true;
 	}
 }
 
@@ -995,6 +1043,21 @@ double TransferItemsState::getDistance() const
 */
 void TransferItemsState::cbxCategoryChange(Action *)
 {
+	_previousSort = _currentSort;
+
+	if (_game->isCtrlPressed())
+	{
+		_currentSort = _game->isShiftPressed() ? TransferSortDirection::BY_UNIT_SIZE : TransferSortDirection::BY_TOTAL_SIZE;
+	}
+	else if (_game->isAltPressed())
+	{
+		_currentSort = _game->isShiftPressed() ? TransferSortDirection::BY_UNIT_COST : TransferSortDirection::BY_TOTAL_COST;
+	}
+	else
+	{
+		_currentSort = TransferSortDirection::BY_LIST_ORDER;
+	}
+
 	updateList();
 }
 

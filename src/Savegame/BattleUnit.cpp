@@ -22,6 +22,7 @@
 #include "BattleItem.h"
 #include <sstream>
 #include <algorithm>
+#include "../Engine/Collections.h"
 #include "../Engine/Surface.h"
 #include "../Engine/Script.h"
 #include "../Engine/ScriptBind.h"
@@ -291,12 +292,12 @@ void BattleUnit::prepareUnitSounds()
 
 	if (_geoscapeSoldier)
 	{
-		_aggroSound = Mod::NO_SOUND;
+		Collections::removeAll(_aggroSound);
 		_moveSound = _armor->getMoveSound() != Mod::NO_SOUND ? _armor->getMoveSound() : Mod::NO_SOUND; // there's no soldier move sound, thus hardcoded -1
 	}
 	else if (_unitRules)
 	{
-		_aggroSound = _unitRules->getAggroSound();
+		_aggroSound = _unitRules->getAggroSounds();
 		_moveSound = _armor->getMoveSound() != Mod::NO_SOUND ? _armor->getMoveSound() : _unitRules->getMoveSound();
 	}
 
@@ -1574,7 +1575,7 @@ int BattleUnit::damage(Position relative, int damage, const RuleDamageType *type
 	}
 
 	const int orgDamage = damage;
-	const int overKillMinimum = type->IgnoreOverKill ? 0 : -4 * _stats.health;
+	const int overKillMinimum = type->IgnoreOverKill ? 0 : -UnitStats::OverkillMultipler * _stats.health;
 
 	{
 		ModScript::HitUnit::Output args { damage, bodypart, side, };
@@ -1668,7 +1669,7 @@ int BattleUnit::damage(Position relative, int damage, const RuleDamageType *type
 
 		if (!_armor->getPainImmune() || type->IgnorePainImmunity)
 		{
-			setValueMax(_stunlevel, std::get<toStun>(args.data), 0, 4 * _stats.health);
+			setValueMax(_stunlevel, std::get<toStun>(args.data), 0, UnitStats::StunMultipler * _stats.health);
 		}
 
 		moraleChange(- reduceByBravery(std::get<toMorale>(args.data)));
@@ -2408,7 +2409,7 @@ void BattleUnit::prepareHealth(int health)
 		_fire--;
 	}
 
-	setValueMax(_health, health, -4 * _stats.health, _stats.health);
+	setValueMax(_health, health, -UnitStats::OverkillMultipler * _stats.health, _stats.health);
 
 	// if unit is dead, AI state should be gone
 	if (_health <= 0 && _currentAIState)
@@ -3165,7 +3166,7 @@ BattleItem *BattleUnit::getMainHandWeapon(bool quickest) const
 	// otherwise pick the one with the least snapshot TUs
 	int tuRightHand = getActionTUs(BA_SNAPSHOT, weaponRightHand).Time;
 	int tuLeftHand = getActionTUs(BA_SNAPSHOT, weaponLeftHand).Time;
-	BattleItem *weaponCurrentHand = getActiveHand(weaponLeftHand, weaponRightHand);
+	BattleItem *weaponCurrentHand = const_cast<BattleItem*>(getActiveHand(weaponLeftHand, weaponRightHand));
 	//prioritize blaster
 	if (!quickest && _faction != FACTION_PLAYER)
 	{
@@ -3288,7 +3289,7 @@ void BattleUnit::setActiveLeftHand()
 /**
  * Choose what weapon was last use by unit.
  */
-BattleItem *BattleUnit::getActiveHand(BattleItem *left, BattleItem *right) const
+const BattleItem *BattleUnit::getActiveHand(const BattleItem *left, const BattleItem *right) const
 {
 	if (_activeHand == "STR_RIGHT_HAND" && right) return right;
 	if (_activeHand == "STR_LEFT_HAND" && left) return left;
@@ -4201,12 +4202,25 @@ void BattleUnit::instaKill()
 }
 
 /**
- * Get sound to play when unit aggros.
- * @return sound
+ * Gets whether the unit has any aggro sounds.
+ * @return True, if the unit has any aggro sounds.
  */
-int BattleUnit::getAggroSound() const
+bool BattleUnit::hasAggroSound() const
 {
-	return _aggroSound;
+	return !_aggroSound.empty();
+}
+
+/**
+ * Gets a unit's random aggro sound.
+ * @return The sound id.
+ */
+int BattleUnit::getRandomAggroSound() const
+{
+	if (hasAggroSound())
+	{
+		return _aggroSound[RNG::generate(0, _aggroSound.size() - 1)];
+	}
+	return -1;
 }
 
 /**
@@ -5093,7 +5107,7 @@ void addArmorValueScript(BattleUnit *bu, int side, int value)
 	if (bu && 0 <= side && side < SIDE_MAX)
 	{
 		//limit range to prevent overflow
-		value = Clamp(value, -1000, 1000);
+		value = Clamp(value, -UnitStats::BaseStatLimit, UnitStats::BaseStatLimit);
 		bu->setArmor(value + bu->getArmor((UnitSide)side), (UnitSide)side);
 	}
 }
@@ -5128,7 +5142,7 @@ void addFatalWoundScript(BattleUnit *bu, int part, int val)
 	if (bu && 0 <= part && part < BODYPART_MAX)
 	{
 		//limit range to prevent overflow
-		val = Clamp(val, -1000, 1000);
+		val = Clamp(val, -UnitStats::BaseStatLimit, UnitStats::BaseStatLimit);
 		bu->setFatalWound(val + bu->getFatalWound((UnitBodyPart)part), (UnitBodyPart)part);
 	}
 }
@@ -5286,7 +5300,7 @@ void getStunMaxScript(const BattleUnit *bu, int &maxStun)
 {
 	if (bu)
 	{
-		maxStun = bu->getBaseStats()->health * 4;
+		maxStun = bu->getBaseStats()->health * UnitStats::StunMultipler;
 		return;
 	}
 	maxStun = 0;
@@ -5461,7 +5475,7 @@ void addBaseStatScript(BattleUnit *bu, int val)
 	if (bu)
 	{
 		//limit range to prevent overflow
-		val = Clamp(val, -1000, 1000);
+		val = Clamp(val, -UnitStats::BaseStatLimit, UnitStats::BaseStatLimit);
 		setBaseStatScript<StatCurr, StatMax>(bu, val + (bu->*StatCurr));
 	}
 }
@@ -5471,7 +5485,7 @@ void setStunScript(BattleUnit *bu, int val)
 {
 	if (bu)
 	{
-		(bu->*StatCurr) = Clamp(val, 0, (bu->getBaseStats()->health) * 4);
+		(bu->*StatCurr) = Clamp(val, 0, (bu->getBaseStats()->health) * UnitStats::StunMultipler);
 	}
 }
 
@@ -5481,7 +5495,7 @@ void addStunScript(BattleUnit *bu, int val)
 	if (bu)
 	{
 		//limit range to prevent overflow, 4 time bigger than normal as stun can be 4 time bigger than health
-		val = Clamp(val, -4000, 4000);
+		val = Clamp(val, -UnitStats::StunStatLimit, UnitStats::StunStatLimit);
 		setStunScript<StatCurr>(bu, val + (bu->*StatCurr));
 	}
 }
@@ -5501,7 +5515,7 @@ void addBaseStatRangeScript(BattleUnit *bu, int val)
 	if (bu)
 	{
 		//limit range to prevent overflow
-		val = Clamp(val, -1000, 1000);
+		val = Clamp(val, -UnitStats::BaseStatLimit, UnitStats::BaseStatLimit);
 		setBaseStatRangeScript<StatCurr, Min, Max>(bu, val + (bu->*StatCurr));
 	}
 }
@@ -5510,7 +5524,7 @@ void setFireScript(BattleUnit *bu, int val)
 {
 	if (bu)
 	{
-		val = Clamp(val, 0, 1000);
+		val = Clamp(val, 0, UnitStats::BaseStatLimit);
 		bu->setFire(val);
 	}
 }
@@ -5831,7 +5845,7 @@ void BattleUnit::ScriptRegister(ScriptParserBase* parser)
 
 	bu.addField<&BattleUnit::_health>("getHealth");
 	bu.add<UnitStats::getMaxStatScript<BattleUnit, &BattleUnit::_stats, &UnitStats::health>>("getHealthMax");
-	bu.add<&setBaseStatScript<&BattleUnit::_health, &UnitStats::health>>("setHealth");
+	bu.add<&setBaseStatScript<&BattleUnit::_health, &UnitStats::health>>("setHealth"); //TODO: allow overkill? now minim is 0.
 	bu.add<&addBaseStatScript<&BattleUnit::_health, &UnitStats::health>>("addHealth");
 
 	bu.addField<&BattleUnit::_mana>("getMana");
@@ -6038,7 +6052,11 @@ void commonBattleUnitAnimations(ScriptParserBase* parser)
 /**
  * Constructor of recolor script parser.
  */
-ModScript::RecolorUnitParser::RecolorUnitParser(ScriptGlobal* shared, const std::string& name, Mod* mod) : ScriptParserEvents{ shared, name, "new_pixel", "old_pixel", "unit", "blit_part", "anim_frame", "shade", "burn" }
+ModScript::RecolorUnitParser::RecolorUnitParser(ScriptGlobal* shared, const std::string& name, Mod* mod) : ScriptParserEvents{ shared, name,
+	"new_pixel",
+	"old_pixel",
+
+	"unit", "battle_game", "blit_part", "anim_frame", "shade", "burn" }
 {
 	BindBase b { this };
 
@@ -6058,7 +6076,11 @@ ModScript::RecolorUnitParser::RecolorUnitParser(ScriptGlobal* shared, const std:
 /**
  * Constructor of select sprite script parser.
  */
-ModScript::SelectUnitParser::SelectUnitParser(ScriptGlobal* shared, const std::string& name, Mod* mod) : ScriptParserEvents{ shared, name, "sprite_index", "sprite_offset", "unit", "blit_part", "anim_frame", "shade" }
+ModScript::SelectUnitParser::SelectUnitParser(ScriptGlobal* shared, const std::string& name, Mod* mod) : ScriptParserEvents{ shared, name,
+	"sprite_index",
+	"sprite_offset",
+
+	"unit", "battle_game", "blit_part", "anim_frame", "shade" }
 {
 	BindBase b { this };
 
@@ -6119,12 +6141,12 @@ ModScript::VisibilityUnitParser::VisibilityUnitParser(ScriptGlobal* shared, cons
 /**
  * Init all required data in script using object data.
  */
-void BattleUnit::ScriptFill(ScriptWorkerBlit* w, BattleUnit* unit, int body_part, int anim_frame, int shade, int burn)
+void BattleUnit::ScriptFill(ScriptWorkerBlit* w, const BattleUnit* unit, const SavedBattleGame* save, int body_part, int anim_frame, int shade, int burn)
 {
 	w->clear();
 	if(unit)
 	{
-		w->update(unit->getArmor()->getScript<ModScript::RecolorUnitSprite>(), unit, body_part, anim_frame, shade, burn);
+		w->update(unit->getArmor()->getScript<ModScript::RecolorUnitSprite>(), unit, save, body_part, anim_frame, shade, burn);
 	}
 }
 

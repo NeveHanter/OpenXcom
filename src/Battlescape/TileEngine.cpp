@@ -2658,9 +2658,15 @@ void TileEngine::explode(BattleActionAttack attack, Position center, int power, 
 						toRemove.clear();
 						if (bu)
 						{
-							if (Position::distance2d(dest->getPosition(), centetTile) < 2)
+							if (
+									(
+										Position::distance2dSq(dest->getPosition(), centetTile) < 4
+										&& dest->getPosition().z == centetTile.z
+									)
+									|| dest->getPosition().z > centetTile.z
+								)
 							{
-								// ground zero effect is in effect
+								// ground zero effect is in effect, or unit is above explosion
 								hitUnit(attack, bu, Position(0, 0, 0), damage, type, rangeAtack);
 							}
 							else

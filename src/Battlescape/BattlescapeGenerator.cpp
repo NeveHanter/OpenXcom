@@ -1330,8 +1330,8 @@ BattleUnit *BattlescapeGenerator::addXCOMUnit(BattleUnit *unit)
 				{
 					if (_save->setUnitPosition(unit, _save->getTile(i)->getPosition()))
 					{
-						_save->initUnit(unit);
 						_save->getUnits()->push_back(unit);
+						_save->initUnit(unit);
 						return unit;
 					}
 				}
@@ -2699,7 +2699,7 @@ void BattlescapeGenerator::generateMap(const std::vector<MapScript*> *script, co
 								{
 									for (std::vector<int>::const_iterator z = command->getGroups()->begin(); z != command->getGroups()->end() && !success; ++z)
 									{
-										success = _blocks[x][y]->isInGroup((*z));
+										success = _blocks[x][y] && _blocks[x][y]->isInGroup((*z));
 									}
 								}
 								else if (!command->getBlocks()->empty())
