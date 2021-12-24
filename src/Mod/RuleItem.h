@@ -77,6 +77,9 @@ enum BattleActionType : Uint8
 	BA_RETHINK = 15,
 
 	BA_CQB = 16,
+
+	BA_TRIGGER_TIMED_GRENADE = 17,
+	BA_TRIGGER_PROXY_GRENADE = 18,
 };
 
 enum class BattleActionOrigin { CENTRE = 0, LEFT, RIGHT }; // Used for off-centre shooting.
@@ -350,6 +353,7 @@ private:
 	std::vector<const RuleItem*> _compatibleAmmo[AmmoSlotMax];
 	std::unordered_map<const RuleItem*, int> _compatibleAmmoSlots;
 	RuleDamageType _damageType, _meleeType;
+	bool _damageTypeSet, _meleeTypeSet;
 	RuleItemAction _confAimed, _confAuto, _confSnap, _confMelee;
 	int _accuracyUse, _accuracyMind, _accuracyPanic, _accuracyThrow, _accuracyCloseQuarters;
 	int _noLOSAccuracyPenalty;
@@ -693,8 +697,10 @@ public:
 
 	/// Gets the item's damage type.
 	const RuleDamageType *getDamageType() const;
+	bool isDamageTypeSet() const { return _damageTypeSet; }
 	/// Gets the item's melee damage type for range weapons.
 	const RuleDamageType *getMeleeType() const;
+	bool isMeleeTypeSet() const { return _meleeTypeSet; }
 	/// Gets the item's type.
 	BattleType getBattleType() const;
 	/// Gets the item's fuse type.
@@ -715,7 +721,7 @@ public:
 	/// Gets the chance of special effect like zombify or corpse explosion or mine triggering.
 	int getSpecialChance() const;
 	/// Draws the item's hand sprite onto a surface.
-	void drawHandSprite(SurfaceSet *texture, Surface *surface, BattleItem *item = 0, int animFrame = 0) const;
+	void drawHandSprite(const SurfaceSet *texture, Surface *surface, const BattleItem *item = 0, const SavedBattleGame* save = 0, int animFrame = 0) const;
 	/// item's hand spite x offset
 	int getHandSpriteOffX() const;
 	/// item's hand spite y offset

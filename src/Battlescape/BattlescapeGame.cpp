@@ -369,9 +369,9 @@ void BattlescapeGame::handleAI(BattleUnit *unit)
 
 	if (unit->getCharging() != 0)
 	{
-		if (unit->getAggroSound() != -1 && !_playedAggroSound)
+		if (unit->hasAggroSound() && !_playedAggroSound)
 		{
-			getMod()->getSoundByDepth(_save->getDepth(), unit->getAggroSound())->play(-1, getMap()->getSoundAngle(unit->getPosition()));
+			getMod()->getSoundByDepth(_save->getDepth(), unit->getRandomAggroSound())->play(-1, getMap()->getSoundAngle(unit->getPosition()));
 			_playedAggroSound = true;
 		}
 	}
@@ -518,12 +518,12 @@ void BattlescapeGame::endTurn()
 				}
 				if (tile)
 				{
-					if (item->fuseEndTurnEffect())
+					if (item->fuseTimeEvent())
 					{
 						if (rule->getBattleType() == BT_GRENADE) // it's a grenade to explode now
 						{
 							Position p = tile->getPosition().toVoxel() + Position(8, 8, -tile->getTerrainLevel() + (unit ? unit->getHeight() / 2 : 0));
-							forRemoval.push_back(std::tuple(nullptr, new ExplosionBState(this, p, BattleActionAttack::GetBeforeShoot(BA_NONE, unit, item))));
+							forRemoval.push_back(std::tuple(nullptr, new ExplosionBState(this, p, BattleActionAttack::GetBeforeShoot(BA_TRIGGER_TIMED_GRENADE, unit, item))));
 							exploded = true;
 						}
 						else
@@ -579,7 +579,7 @@ void BattlescapeGame::endTurn()
 				{
 					continue;
 				}
-				item->fuseTimerEvent();
+				item->fuseEndTurnUpdate();
 			}
 		}
 
@@ -887,7 +887,7 @@ void BattlescapeGame::checkForCasualties(const RuleDamageType *damageType, Battl
 						deathStat->setUnitStats(murderer);
 						deathStat->faction = murderer->getOriginalFaction();
 					}
-					_parentState->getGame()->getSavedGame()->killSoldier(victim->getGeoscapeSoldier(), deathStat);
+					_parentState->getGame()->getSavedGame()->killSoldier(getMod(), victim->getGeoscapeSoldier(), deathStat);
 				}
 			}
 			else if ((*j)->getStunlevel() >= (*j)->getHealth() && (*j)->getStatus() != STATUS_UNCONSCIOUS)
@@ -1067,7 +1067,7 @@ void BattlescapeGame::setupCursor()
 
 /**
  * Determines whether a playable unit is selected. Normally only player side units can be selected, but in debug mode one can play with aliens too :)
- * Is used to see if stats can be displayed and action buttons will work.
+ * Is used to see if stats can be displayed.
  * @return Whether a playable unit is selected.
  */
 bool BattlescapeGame::playableUnitSelected() const
@@ -2174,7 +2174,6 @@ void BattlescapeGame::spawnNewUnit(BattleActionAttack attack, Position position)
 		size_t itemLevel = (size_t)(getMod()->getAlienItemLevels().at(month).at(RNG::generate(0,9)));
 
 		// Initialize the unit and its position
-		getSave()->initUnit(newUnit, itemLevel);
 		newUnit->setTile(_save->getTile(position), _save);
 		newUnit->setPosition(position);
 		newUnit->setDirection(unitDirection);
@@ -2182,6 +2181,7 @@ void BattlescapeGame::spawnNewUnit(BattleActionAttack attack, Position position)
 		getSave()->getUnits()->push_back(newUnit);
 		bool visible = faction == FACTION_PLAYER;
 		newUnit->setVisible(visible);
+		getSave()->initUnit(newUnit, itemLevel);
 
 		getTileEngine()->calculateFOV(newUnit->getPosition());  //happens fairly rarely, so do a full recalc for units in range to handle the potential unit visible cache issues.
 		getTileEngine()->applyGravity(newUnit->getTile());
@@ -2940,7 +2940,7 @@ int BattlescapeGame::checkForProximityGrenades(BattleUnit *unit)
 			{
 				deathTrapItem->setFuseTimer(0);
 				Position p = deathTrapTile->getPosition().toVoxel() + Position(8, 8, deathTrapTile->getTerrainLevel());
-				statePushNext(new ExplosionBState(this, p, BattleActionAttack::GetBeforeShoot(BA_NONE, nullptr, deathTrapItem)));
+				statePushNext(new ExplosionBState(this, p, BattleActionAttack::GetBeforeShoot(BA_TRIGGER_PROXY_GRENADE, nullptr, deathTrapItem)));
 				return 2;
 			}
 			else if (deathTrapRule->getBattleType() == BT_MELEE)
@@ -2973,7 +2973,7 @@ int BattlescapeGame::checkForProximityGrenades(BattleUnit *unit)
 						if (ruleItem->getBattleType() == BT_GRENADE || ruleItem->getBattleType() == BT_PROXIMITYGRENADE)
 						{
 							Position p = t->getPosition().toVoxel() + Position(8, 8, t->getTerrainLevel());
-							statePushNext(new ExplosionBState(this, p, BattleActionAttack::GetBeforeShoot(BA_NONE, nullptr, item)));
+							statePushNext(new ExplosionBState(this, p, BattleActionAttack::GetBeforeShoot(BA_TRIGGER_PROXY_GRENADE, nullptr, item)));
 							exploded = true;
 						}
 						else

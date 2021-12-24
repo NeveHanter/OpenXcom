@@ -1820,13 +1820,13 @@ BattleUnit *SavedBattleGame::convertUnit(BattleUnit *unit)
 
 	BattleUnit *newUnit = createTempUnit(type, unit->getSpawnUnitFaction());
 
-	initUnit(newUnit);
+	newUnit->clearTimeUnits();
+	newUnit->setVisible(visible);
 	newUnit->setTile(tile, this);
 	newUnit->setPosition(unit->getPosition());
 	newUnit->setDirection(unit->getDirection());
-	newUnit->clearTimeUnits();
 	getUnits()->push_back(newUnit);
-	newUnit->setVisible(visible);
+	initUnit(newUnit);
 
 	getTileEngine()->calculateFOV(newUnit->getPosition());  //happens fairly rarely, so do a full recalc for units in range to handle the potential unit visible cache issues.
 	getTileEngine()->applyGravity(newUnit->getTile());
@@ -3105,6 +3105,7 @@ void SavedBattleGame::resetUnitHitStates()
 
 namespace
 {
+
 template<typename... Args>
 void flashMessageVariadicScriptImpl(SavedBattleGame* sbg, ScriptText message, Args... args)
 {
@@ -3117,6 +3118,21 @@ void flashMessageVariadicScriptImpl(SavedBattleGame* sbg, ScriptText message, Ar
 	(translated.arg(args), ...);
 	sbg->getBattleState()->warningRaw(translated);
 }
+
+template<typename... Args>
+void flashLongMessageVariadicScriptImpl(SavedBattleGame* sbg, ScriptText message, Args... args)
+{
+	if (!sbg || !sbg->getBattleState())
+	{
+		return;
+	}
+	const Language *lang = sbg->getBattleState()->getGame()->getLanguage();
+	LocalizedText translated = lang->getString(message);
+	(translated.arg(args), ...);
+	sbg->getBattleState()->warningLongRaw(translated);
+}
+
+
 
 void randomChanceScript(SavedBattleGame* sbg, int& val)
 {
@@ -3244,7 +3260,7 @@ void SavedBattleGame::ScriptRegister(ScriptParserBase* parser)
 
 	Bind<SavedBattleGame> sbg = { parser };
 
-	sbg.add<&SavedBattleGame::getTurn>("getTurn");
+	sbg.add<&SavedBattleGame::getTurn>("getTurn", "Current turn, 0 - before battle, 1 - fisrt turn, each stage reset this value.");
 	sbg.add<&SavedBattleGame::getAnimFrame>("getAnimFrame");
 	sbg.add<&getTileScript>("getTile", "Get tile on position x, y, z");
 
@@ -3255,6 +3271,12 @@ void SavedBattleGame::ScriptRegister(ScriptParserBase* parser)
 	sbg.add<void(*)(SavedBattleGame*, ScriptText, int, int), &flashMessageVariadicScriptImpl>("flashMessage");
 	sbg.add<void(*)(SavedBattleGame*, ScriptText, int, int, int), &flashMessageVariadicScriptImpl>("flashMessage");
 	sbg.add<void(*)(SavedBattleGame*, ScriptText, int, int, int, int), &flashMessageVariadicScriptImpl>("flashMessage");
+
+	sbg.add<void(*)(SavedBattleGame*, ScriptText), &flashLongMessageVariadicScriptImpl>("flashLongMessage");
+	sbg.add<void(*)(SavedBattleGame*, ScriptText, int), &flashLongMessageVariadicScriptImpl>("flashLongMessage");
+	sbg.add<void(*)(SavedBattleGame*, ScriptText, int, int), &flashLongMessageVariadicScriptImpl>("flashLongMessage");
+	sbg.add<void(*)(SavedBattleGame*, ScriptText, int, int, int), &flashLongMessageVariadicScriptImpl>("flashLongMessage");
+	sbg.add<void(*)(SavedBattleGame*, ScriptText, int, int, int, int), &flashLongMessageVariadicScriptImpl>("flashLongMessage");
 
 	sbg.add<&randomChanceScript>("randomChance", "first argument is percent in range 0 - 100, then return in that argument random 1 or 0 based on percent");
 	sbg.add<&randomRangeScript>("randomRange", "set in first argument random value from range given in two last arguments");

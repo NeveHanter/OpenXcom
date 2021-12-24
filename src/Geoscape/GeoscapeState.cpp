@@ -1111,7 +1111,7 @@ void GeoscapeState::time5Seconds()
 					{
 						if ((*k)->getCraft() == (*j))
 						{
-							k = _game->getSavedGame()->killSoldier(*k);
+							k = _game->getSavedGame()->killSoldier(_game->getMod(), *k);
 						}
 						else
 						{
@@ -1775,7 +1775,19 @@ void GeoscapeState::time30Minutes()
 	// Decrease mission countdowns
 	for (auto am : _game->getSavedGame()->getAlienMissions())
 	{
+		size_t abCount = _game->getSavedGame()->getAlienBases()->size();
+
 		am->think(*_game, *_globe);
+
+		if (abCount < _game->getSavedGame()->getAlienBases()->size())
+		{
+			AlienBase* newAlienBase = _game->getSavedGame()->getAlienBases()->back();
+			if (!newAlienBase->isDiscovered() && am->getRules().showAlienBase())
+			{
+				newAlienBase->setDiscovered(true);
+				popup(new AlienBaseState(newAlienBase, this));
+			}
+		}
 	}
 
 	// Remove finished missions
@@ -1894,15 +1906,16 @@ void GeoscapeState::time30Minutes()
 
 				auto detected = DETECTION_NONE;
 				auto alreadyTracked = ufo->getDetected();
+				auto save = _game->getSavedGame();
 
 				for (auto base : *_game->getSavedGame()->getBases())
 				{
-					detected = maskBitOr(detected, base->detect(ufo, alreadyTracked));
+					detected = maskBitOr(detected, base->detect(ufo, save, alreadyTracked));
 				}
 
 				for (auto craft : *activeCrafts)
 				{
-					detected = maskBitOr(detected, craft->detect(ufo, alreadyTracked));
+					detected = maskBitOr(detected, craft->detect(ufo, save, alreadyTracked));
 				}
 
 				if (!alreadyTracked)
@@ -2273,8 +2286,8 @@ void GeoscapeState::time1Day()
 			base->removeResearch(project);
 			project = nullptr;
 
-			// 3b. handle interrogation and spawned items/events
-			if (Options::retainCorpses && research->destroyItem())
+			// 3b. handle interrogation
+			if (Options::retainCorpses && research->needItem() && research->destroyItem())
 			{
 				auto ruleUnit = mod->getUnit(research->getName(), false);
 				if (ruleUnit)
@@ -2285,25 +2298,6 @@ void GeoscapeState::time1Day()
 						base->getStorageItems()->addItem(ruleCorpse->getType());
 					}
 				}
-			}
-			RuleItem *spawnedItem = _game->getMod()->getItem(research->getSpawnedItem());
-			if (spawnedItem)
-			{
-				Transfer *t = new Transfer(1);
-				t->setItems(research->getSpawnedItem());
-				base->getTransfers()->push_back(t);
-			}
-			RuleEvent* spawnedEventRule = _game->getMod()->getEvent(research->getSpawnedEvent());
-			if (spawnedEventRule)
-			{
-				GeoscapeEvent* newEvent = new GeoscapeEvent(*spawnedEventRule);
-				int minutes = (spawnedEventRule->getTimer() + (RNG::generate(0, spawnedEventRule->getTimerRandom()))) / 30 * 30;
-				if (minutes < 60) minutes = 60; // just in case
-				newEvent->setSpawnCountdown(minutes);
-				saveGame->getGeoscapeEvents().push_back(newEvent);
-
-				// remember that it has been generated
-				saveGame->addGeneratedEvent(spawnedEventRule);
 			}
 			// 3c. handle getonefrees (topic+lookup)
 			if ((bonus = saveGame->selectGetOneFree(research)))
@@ -2386,6 +2380,8 @@ void GeoscapeState::time1Day()
 			}
 			if (!newPossibleManufacture.empty())
 			{
+				Collections::sortVector(newPossibleManufacture);
+				Collections::sortVectorMakeUnique(newPossibleManufacture);
 				popup(new NewPossibleManufactureState(base, newPossibleManufacture));
 			}
 			std::vector<RuleItem *> newPossiblePurchase;
@@ -2396,6 +2392,8 @@ void GeoscapeState::time1Day()
 			}
 			if (!newPossiblePurchase.empty())
 			{
+				Collections::sortVector(newPossiblePurchase);
+				Collections::sortVectorMakeUnique(newPossiblePurchase);
 				popup(new NewPossiblePurchaseState(base, newPossiblePurchase));
 			}
 			std::vector<RuleCraft *> newPossibleCraft;
@@ -2406,6 +2404,8 @@ void GeoscapeState::time1Day()
 			}
 			if (!newPossibleCraft.empty())
 			{
+				Collections::sortVector(newPossibleCraft);
+				Collections::sortVectorMakeUnique(newPossibleCraft);
 				popup(new NewPossibleCraftState(base, newPossibleCraft));
 			}
 			std::vector<RuleBaseFacility *> newPossibleFacilities;
@@ -2416,30 +2416,73 @@ void GeoscapeState::time1Day()
 			}
 			if (!newPossibleFacilities.empty())
 			{
+				Collections::sortVector(newPossibleFacilities);
+				Collections::sortVectorMakeUnique(newPossibleFacilities);
 				popup(new NewPossibleFacilityState(base, _globe, newPossibleFacilities));
 			}
-			// 3j. now iterate through all the bases and remove this project from their labs (unless it can still yield more stuff!)
-			for (Base *otherBase : *saveGame->getBases())
+
+			std::vector<const RuleResearch*> topicsToCheck;
+			topicsToCheck.push_back(research);
+			if (bonus)
 			{
-				for (ResearchProject* otherProject : otherBase->getResearch())
+				topicsToCheck.push_back(bonus);
+			}
+			for (auto *myResearchRule : topicsToCheck)
+			{
+				// 3j. now iterate through all the bases and remove this project from their labs (unless it can still yield more stuff!)
+				for (Base *otherBase : *saveGame->getBases())
 				{
-					if (research->getName() == otherProject->getRules()->getName())
+					for (ResearchProject *otherProject : otherBase->getResearch())
 					{
-						if (saveGame->hasUndiscoveredGetOneFree(research, true))
+						if (myResearchRule == otherProject->getRules())
 						{
-							// This research topic still has some more undiscovered non-disabled and *AVAILABLE* "getOneFree" topics, keep it!
-						}
-						else if (saveGame->hasUndiscoveredProtectedUnlock(research, mod))
-						{
-							// This research topic still has one or more undiscovered non-disabled "protected unlocks", keep it!
-						}
-						else
-						{
-							// This topic can't give you anything else anymore, remove it!
-							otherBase->removeResearch(otherProject);
-							break;
+							if (saveGame->hasUndiscoveredGetOneFree(myResearchRule, true))
+							{
+								// This research topic still has some more undiscovered non-disabled and *AVAILABLE* "getOneFree" topics, keep it!
+							}
+							else if (saveGame->hasUndiscoveredProtectedUnlock(myResearchRule, mod))
+							{
+								// This research topic still has one or more undiscovered non-disabled "protected unlocks", keep it!
+							}
+							else
+							{
+								// This topic can't give you anything else anymore, remove it!
+								otherBase->removeResearch(otherProject);
+								break;
+							}
 						}
 					}
+				}
+				// 3k. handle spawned items
+				RuleItem* spawnedItem = _game->getMod()->getItem(myResearchRule->getSpawnedItem());
+				if (spawnedItem)
+				{
+					Transfer* t = new Transfer(1);
+					t->setItems(myResearchRule->getSpawnedItem(), std::max(1, myResearchRule->getSpawnedItemCount()));
+					base->getTransfers()->push_back(t);
+				}
+				for (auto& spawnedItemName2 : myResearchRule->getSpawnedItemList())
+				{
+					RuleItem* spawnedItem2 = _game->getMod()->getItem(spawnedItemName2);
+					if (spawnedItem2)
+					{
+						Transfer* t = new Transfer(1);
+						t->setItems(spawnedItemName2);
+						base->getTransfers()->push_back(t);
+					}
+				}
+				// 3l. handle spawned events
+				RuleEvent* spawnedEventRule = _game->getMod()->getEvent(myResearchRule->getSpawnedEvent());
+				if (spawnedEventRule)
+				{
+					GeoscapeEvent* newEvent = new GeoscapeEvent(*spawnedEventRule);
+					int minutes = (spawnedEventRule->getTimer() + (RNG::generate(0, spawnedEventRule->getTimerRandom()))) / 30 * 30;
+					if (minutes < 60) minutes = 60; // just in case
+					newEvent->setSpawnCountdown(minutes);
+					saveGame->getGeoscapeEvents().push_back(newEvent);
+
+					// remember that it has been generated
+					saveGame->addGeneratedEvent(spawnedEventRule);
 				}
 			}
 		}
@@ -3772,6 +3815,11 @@ void GeoscapeState::determineAlienMissions()
 			auto upgrade = mod->getDeployment(upgradeId, false);
 			if (upgrade && upgrade != alienBase->getDeployment())
 			{
+				if (alienBase->getDeployment()->resetAlienBaseAgeAfterUpgrade())
+				{
+					// reset base age to zero
+					alienBase->setStartMonth(month);
+				}
 				alienBase->setDeployment(upgrade);
 			}
 		}
