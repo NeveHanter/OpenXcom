@@ -3683,6 +3683,8 @@ void GeoscapeState::determineAlienMissions()
 				(month < 1 || eventScript->getMaxScore() >= currentScore) &&
 				(month < 1 || eventScript->getMinFunds() <= currentFunds) &&
 				(month < 1 || eventScript->getMaxFunds() >= currentFunds) &&
+				(eventScript->getMissionMinRuns() == 0  || eventScript->getMissionMinRuns() <= strategy.getMissionsRun(eventScript->getMissionVarName())) &&
+				(eventScript->getMissionMaxRuns() == -1 || eventScript->getMissionMaxRuns() >= strategy.getMissionsRun(eventScript->getMissionVarName())) &&
 				eventScript->getMinDifficulty() <= save->getDifficulty() &&
 				eventScript->getMaxDifficulty() >= save->getDifficulty())
 			{
@@ -3815,7 +3817,7 @@ void GeoscapeState::determineAlienMissions()
 			auto upgrade = mod->getDeployment(upgradeId, false);
 			if (upgrade && upgrade != alienBase->getDeployment())
 			{
-				if (alienBase->getDeployment()->resetAlienBaseAgeAfterUpgrade())
+				if (alienBase->getDeployment()->resetAlienBaseAgeAfterUpgrade() || upgrade->resetAlienBaseAge())
 				{
 					// reset base age to zero
 					alienBase->setStartMonth(month);
@@ -3893,6 +3895,49 @@ bool GeoscapeState::processCommand(RuleMissionScript *command)
 				}
 			}
 
+			// -----------------------------------------------------------
+			// Summary of mission site spawning algorithms (objective: 3)
+			// -----------------------------------------------------------
+
+			// Type 1:
+			// - no UFOs involved
+			// - only 1 wave
+			// - the wave specifies the alien deployment directly (e.g. `ufo: STR_ARTIFACT_SITE_P1 # spawn this site directly`)
+			// - example (1): STR_ALIEN_ARTIFACT (TFTD)
+			// Support for non-point areas: yes, without any additional ruleset changes required
+			const MissionWave& wave = missionRules->getWave(0);
+			bool spawnMissionSiteDirectly = (mod->getDeployment(wave.ufoType) && !mod->getUfo(wave.ufoType) && !mod->getDeployment(wave.ufoType)->getMarkerName().empty());
+
+			// Type 2:
+			// - no UFOs involved
+			// - only 1 wave
+			// - the wave does NOT specify the alien deployment directly (e.g. `ufo: dummy #don't spawn a ufo, we only want the site`)
+			//   -> option A: alien deployment is chosen randomly = from the area's texture definition
+			//   -> option B: alien deployment is specified by the mission's `siteType` (overrides option A if both are defined)
+			// - example (2A): STR_ALIEN_SHIP_ATTACK (TFTD)
+			// - example (2B): none in vanilla, only mods
+			// Support for non-point areas: yes, without any additional ruleset changes required
+			// bool spawnMissionSiteByTexture = area.texture < 0
+			// bool spawnMissionSiteBySiteType = !missionRules->getSiteType().empty();
+
+			// Type 3:
+			// - with UFOs waves
+			// - only 1 wave with `objective: true`
+			// - the wave does NOT specify the alien deployment (because it already specifies the UFO type)
+			//   -> option A: alien deployment is chosen randomly = from the area's texture definition
+			//   -> option B: alien deployment is specified by the mission's `siteType` (overrides option A if both are defined)
+			// - example (3A): STR_ALIEN_SURFACE_ATTACK (TFTD)
+			// - example (3B): none in vanilla, only mods
+			// Support for non-point areas: yes, but it is recommended to use one more wave attribute: `objectiveOnTheLandingSite: true`
+			//   -> false: UFO always lands in the top-left corner of the area; site spawns randomly inside the area
+			//   ->  true: UFO lands randomly inside the area; site spawns exactly on the UFO landing site
+			// bool spawnMissionSiteByTexture = area.texture < 0
+			bool spawnMissionSiteBySiteType = !missionRules->getSiteType().empty();
+
+			// -----------------------------------------------
+			// End of the summary
+			// -----------------------------------------------
+
 			for (std::vector<std::string>::iterator i = regions.begin(); i != regions.end();)
 			{
 				// we don't want the same mission running in any given region twice simultaneously, so prune the list as needed.
@@ -3925,7 +3970,7 @@ bool GeoscapeState::processCommand(RuleMissionScript *command)
 						{
 							validAreas.push_back(std::make_pair(region->getType(), counter));
 						}
-						else if (!(*j).isPoint() && (*j).texture < 0)
+						else if (!(*j).isPoint() && ((*j).texture < 0 || spawnMissionSiteBySiteType || spawnMissionSiteDirectly))
 						{
 							validAreas.push_back(std::make_pair(region->getType(), counter));
 						}
