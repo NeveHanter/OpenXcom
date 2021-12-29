@@ -501,7 +501,7 @@ void SavedGame::load(const std::string &filename, Mod *mod, Language *lang)
 		{
 			const RuleAlienMission &mRule = *mod->getAlienMission(missionType);
 			AlienMission *mission = new AlienMission(mRule);
-			mission->load(*it, *this);
+			mission->load(*it, *this, mod);
 			_activeMissions.push_back(mission);
 		}
 		else
@@ -675,7 +675,7 @@ void SavedGame::load(const std::string &filename, Mod *mod, Language *lang)
 			Log(LOG_ERROR) << "Failed to load research " << id;
 		}
 	}
-	_alienStrategy->load(doc["alienStrategy"]);
+	_alienStrategy->load(doc["alienStrategy"], mod);
 
 	for (YAML::const_iterator i = doc["deadSoldiers"].begin(); i != doc["deadSoldiers"].end(); ++i)
 	{
