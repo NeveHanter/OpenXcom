@@ -3098,6 +3098,144 @@ void SavedGame::clearLinksForAlienBase(AlienBase* alienBase, const Mod* mod)
 	}
 }
 
+/**
+ * Delete the given retaliation mission.
+ */
+void SavedGame::deleteRetaliationMission(AlienMission* am, Base* base)
+{
+	for (std::vector<Ufo*>::iterator i = _ufos.begin(); i != _ufos.end();)
+	{
+		if ((*i)->getMission() == am)
+		{
+			delete (*i);
+			i = _ufos.erase(i);
+		}
+		else
+		{
+			++i;
+		}
+	}
+	for (std::vector<AlienMission*>::iterator i = _activeMissions.begin(); i != _activeMissions.end(); ++i)
+	{
+		if ((*i) == am)
+		{
+			delete (*i);
+			_activeMissions.erase(i);
+			break;
+		}
+	}
+	if (base)
+	{
+		base->setRetaliationMission(nullptr);
+	}
+}
+
+/**
+ * Spawn a Geoscape event from the event rules.
+ * @return True if successful.
+ */
+bool SavedGame::spawnEvent(const RuleEvent* eventRules)
+{
+	if (!eventRules)
+	{
+		return false;
+	}
+
+	GeoscapeEvent* newEvent = new GeoscapeEvent(*eventRules);
+	int minutes = (eventRules->getTimer() + (RNG::generate(0, eventRules->getTimerRandom()))) / 30 * 30;
+	if (minutes < 60) minutes = 60; // just in case
+	newEvent->setSpawnCountdown(minutes);
+	_geoscapeEvents.push_back(newEvent);
+
+	// remember that it has been generated
+	addGeneratedEvent(eventRules);
+
+	return true;
+}
+
+/**
+ * Checks if an instant Geoscape event can be spawned.
+ */
+bool SavedGame::canSpawnInstantEvent(const RuleEvent* eventRules)
+{
+	if (!eventRules)
+	{
+		return false;
+	}
+
+	bool interrupted = false;
+	if (!eventRules->getInterruptResearch().empty())
+	{
+		if (isResearched(eventRules->getInterruptResearch(), false))
+		{
+			interrupted = true;
+		}
+	}
+
+	if (!interrupted)
+	{
+		addGeneratedEvent(eventRules);
+		return true;
+	}
+
+	return false;
+}
+
+/**
+ * Handles research unlocked by successful/failed missions and despawned mission sites.
+ * 1. Adds the research topic to finished research list. Silently.
+ * 2. Adds also getOneFree bonus and possible lookup(s). Also silently.
+ * 3. Handles alien mission interruption.
+ */
+bool SavedGame::handleResearchUnlockedByMissions(const RuleResearch* research, const Mod* mod)
+{
+	if (!research)
+	{
+		return false;
+	}
+	if (_bases.empty())
+	{
+		return false; // all bases lost, game over
+	}
+	Base* base = _bases.front();
+
+	std::vector<const RuleResearch*> researchVec;
+	researchVec.push_back(research);
+	addFinishedResearch(research, mod, base, true);
+	if (!research->getLookup().empty())
+	{
+		researchVec.push_back(mod->getResearch(research->getLookup(), true));
+		addFinishedResearch(researchVec.back(), mod, base, true);
+	}
+
+	if (auto bonus = selectGetOneFree(research))
+	{
+		researchVec.push_back(bonus);
+		addFinishedResearch(bonus, mod, base, true);
+		if (!bonus->getLookup().empty())
+		{
+			researchVec.push_back(mod->getResearch(bonus->getLookup(), true));
+			addFinishedResearch(researchVec.back(), mod, base, true);
+		}
+	}
+
+	// check and interrupt alien missions if necessary (based on unlocked research)
+	for (auto* am : _activeMissions)
+	{
+		auto& interruptResearchName = am->getRules().getInterruptResearch();
+		if (!interruptResearchName.empty())
+		{
+			auto* interruptResearch = mod->getResearch(interruptResearchName, true);
+			if (std::find(researchVec.begin(), researchVec.end(), interruptResearch) != researchVec.end())
+			{
+				am->setInterrupted(true);
+			}
+		}
+	}
+
+	return true;
+}
+
 ////////////////////////////////////////////////////////////
 //					Script binding
 ////////////////////////////////////////////////////////////

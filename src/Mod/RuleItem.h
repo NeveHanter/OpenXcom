@@ -345,7 +345,7 @@ private:
 	int _psiAnimation, _psiAnimFrames;
 	std::vector<int> _psiMissSound;
 	int _psiMissAnimation, _psiMissAnimFrames;
-	int _power;
+	int _power, _powerForAnimation;
 	bool _hidePower;
 	float _powerRangeReduction;
 	float _powerRangeThreshold;
@@ -364,7 +364,8 @@ private:
 	RuleItemFuseTrigger _fuseTriggerEvents;
 	bool _hiddenOnMinimap;
 	std::string _medikitActionName, _psiAttackName, _primeActionName, _unprimeActionName, _primeActionMessage, _unprimeActionMessage;
-	bool _twoHanded, _blockBothHands, _fixedWeapon, _fixedWeaponShow, _isConsumable, _isFireExtinguisher, _isExplodingInHands, _specialUseEmptyHand;
+	bool _twoHanded, _blockBothHands, _fixedWeapon, _fixedWeaponShow, _isConsumable, _isFireExtinguisher;
+	bool _isExplodingInHands, _specialUseEmptyHand, _specialUseEmptyHandShow;
 	std::string _defaultInventorySlotName;
 	const RuleInventory* _defaultInventorySlot;
 	int _defaultInvSlotX, _defaultInvSlotY;
@@ -572,6 +573,8 @@ public:
 
 	/// Gets the item's power.
 	int getPower() const;
+	/// Gets the item's power used for AoE explosion animation.
+	int getPowerForAnimation() const { return _powerForAnimation; }
 	/// Should the item's power be displayed in Ufopedia or not?
 	bool getHidePower() const { return _hidePower; }
 	/// Ok, so this isn't a melee type weapon but we're using it for melee... how much damage should it do?
@@ -766,6 +769,8 @@ public:
 	bool isExplodingInHands() const;
 	/// If this is used as a speacialWeapon, is it accessed by empty hand?
 	bool isSpecialUsingEmptyHand() const;
+	/// Display icon in an empty hand?
+	bool showSpecialInEmptyHand() const { return _specialUseEmptyHandShow; }
 	/// Gets the medikit use type.
 	BattleMediKitType getMediKitType() const;
 	/// Gets the medikit custom background.
