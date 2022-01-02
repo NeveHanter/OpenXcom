@@ -464,6 +464,14 @@ public:
 	int getCurrentScore(int monthsPassed) const;
 	/// Clear links for the given alien base. Use this before deleting the alien base.
 	void clearLinksForAlienBase(AlienBase* alienBase, const Mod* mod);
+	/// Delete the given retaliation mission.
+	void deleteRetaliationMission(AlienMission* am, Base* base);
+	/// Spawn a Geoscape event from the event rules.
+	bool spawnEvent(const RuleEvent* eventRules);
+	/// Checks if an instant Geoscape event can be spawned.
+	bool canSpawnInstantEvent(const RuleEvent* eventRules);
+	/// Handles research unlocked by successful/failed missions and despawned mission sites.
+	bool handleResearchUnlockedByMissions(const RuleResearch* research, const Mod* mod);
 	/// Gets the list of user notes.
 	std::vector<std::string>& getUserNotes() { return _userNotes; }
 };

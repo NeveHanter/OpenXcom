@@ -51,6 +51,7 @@ namespace YAML
 			node["alienRank"] = rhs.alienRank;
 			node["customUnitType"] = rhs.customUnitType;
 			node["lowQty"] = rhs.lowQty;
+			node["medQty"] = rhs.medQty;
 			node["highQty"] = rhs.highQty;
 			node["dQty"] = rhs.dQty;
 			node["extraQty"] = rhs.extraQty;
@@ -68,6 +69,7 @@ namespace YAML
 			rhs.alienRank = node["alienRank"].as<int>(rhs.alienRank);
 			rhs.customUnitType = node["customUnitType"].as<std::string>(rhs.customUnitType);
 			rhs.lowQty = node["lowQty"].as<int>(rhs.lowQty);
+			rhs.medQty = node["medQty"].as<int>(rhs.medQty);
 			rhs.highQty = node["highQty"].as<int>(rhs.highQty);
 			rhs.dQty = node["dQty"].as<int>(rhs.dQty);
 			rhs.extraQty = node["extraQty"].as<int>(0); // give this a default, as it's not 100% needed, unlike the others.
@@ -221,7 +223,9 @@ void AlienDeployment::load(const YAML::Node &node, Mod *mod)
 	_customUfo = node["customUfo"].as<std::string>(_customUfo);
 	_enviroEffects = node["enviroEffects"].as<std::string>(_enviroEffects);
 	_startingCondition = node["startingCondition"].as<std::string>(_startingCondition);
-	_unlockedResearch = node["unlockedResearch"].as<std::string>(_unlockedResearch);
+	_unlockedResearchOnSuccess = node["unlockedResearch"].as<std::string>(_unlockedResearchOnSuccess);
+	_unlockedResearchOnFailure = node["unlockedResearchOnFailure"].as<std::string>(_unlockedResearchOnFailure);
+	_unlockedResearchOnDespawn = node["unlockedResearchOnDespawn"].as<std::string>(_unlockedResearchOnDespawn);
 	_missionBountyItem = node["missionBountyItem"].as<std::string>(_missionBountyItem);
 	_missionBountyItemCount = node["missionBountyItemCount"].as<int>(_missionBountyItemCount);
 	_bughuntMinTurn = node["bughuntMinTurn"].as<int>(_bughuntMinTurn);
@@ -283,6 +287,18 @@ void AlienDeployment::load(const YAML::Node &node, Mod *mod)
 	}
 	_missionCompleteText = node["missionCompleteText"].as<std::string>(_missionCompleteText);
 	_missionFailedText = node["missionFailedText"].as<std::string>(_missionFailedText);
+	if (node["successEvents"])
+	{
+		_successEvents.load(node["successEvents"]);
+	}
+	if (node["despawnEvents"])
+	{
+		_despawnEvents.load(node["despawnEvents"]);
+	}
+	if (node["failureEvents"])
+	{
+		_failureEvents.load(node["failureEvents"]);
+	}
 	_despawnPenalty = node["despawnPenalty"].as<int>(_despawnPenalty);
 	_abortPenalty = node["abortPenalty"].as<int>(_abortPenalty);
 	_points = node["points"].as<int>(_points);
@@ -355,15 +371,6 @@ const std::string& AlienDeployment::getEnviroEffects() const
 const std::string& AlienDeployment::getStartingCondition() const
 {
 	return _startingCondition;
-}
-
-/**
-* Returns the research topic to be unlocked after a successful mission.
-* @return String ID for research topic.
-*/
-std::string AlienDeployment::getUnlockedResearch() const
-{
-	return _unlockedResearch;
 }
 
 /**

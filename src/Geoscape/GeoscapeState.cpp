@@ -1018,7 +1018,7 @@ void GeoscapeState::time5Seconds()
 				{
 					mission->setWaveCountdown(30 * (RNG::generate(0, 400) + 48));
 					(*i)->setDestination(0);
-					base->setupDefenses();
+					base->setupDefenses(mission);
 					timerReset();
 					if (!base->getDefenses()->empty())
 					{
@@ -1746,6 +1746,21 @@ bool GeoscapeState::processMissionSite(MissionSite *site)
 			removeSite = noFollowers; // CHEEKY EXPLOIT
 		}
 	}
+	if (removeSite)
+	{
+		// Unlock research defined in alien deployment, if the mission site despawned
+		const RuleResearch* research = _game->getMod()->getResearch(site->getDeployment()->getUnlockedResearchOnDespawn());
+		_game->getSavedGame()->handleResearchUnlockedByMissions(research, _game->getMod());
+
+		// Generate a despawn event
+		auto eventRules = _game->getMod()->getEvent(site->getDeployment()->chooseDespawnEvent());
+		bool canSpawn = _game->getSavedGame()->canSpawnInstantEvent(eventRules);
+		if (canSpawn)
+		{
+			timerReset();
+			popup(new GeoscapeEventState(*eventRules));
+		}
+	}
 
 	int score = removeSite ? site->getDeployment()->getDespawnPenalty() : site->getDeployment()->getPoints();
 
@@ -1786,6 +1801,17 @@ void GeoscapeState::time30Minutes()
 			{
 				newAlienBase->setDiscovered(true);
 				popup(new AlienBaseState(newAlienBase, this));
+			}
+		}
+
+		if (am->getRules().getObjective() == OBJECTIVE_RETALIATION && am->isOver())
+		{
+			for (auto* xcomBase : *_game->getSavedGame()->getBases())
+			{
+				if (xcomBase->getRetaliationMission() == am)
+				{
+					xcomBase->setRetaliationMission(nullptr);
+				}
 			}
 		}
 	}
@@ -1987,7 +2013,7 @@ void GeoscapeState::time30Minutes()
 			if (!interrupted)
 			{
 				timerReset();
-				popup(new GeoscapeEventState(ge));
+				popup(new GeoscapeEventState(ge->getRules()));
 			}
 		}
 	}
@@ -2473,17 +2499,7 @@ void GeoscapeState::time1Day()
 				}
 				// 3l. handle spawned events
 				RuleEvent* spawnedEventRule = _game->getMod()->getEvent(myResearchRule->getSpawnedEvent());
-				if (spawnedEventRule)
-				{
-					GeoscapeEvent* newEvent = new GeoscapeEvent(*spawnedEventRule);
-					int minutes = (spawnedEventRule->getTimer() + (RNG::generate(0, spawnedEventRule->getTimerRandom()))) / 30 * 30;
-					if (minutes < 60) minutes = 60; // just in case
-					newEvent->setSpawnCountdown(minutes);
-					saveGame->getGeoscapeEvents().push_back(newEvent);
-
-					// remember that it has been generated
-					saveGame->addGeneratedEvent(spawnedEventRule);
-				}
+				saveGame->spawnEvent(spawnedEventRule);
 			}
 		}
 
@@ -2562,10 +2578,10 @@ void GeoscapeState::time1Day()
 	// check and interrupt alien missions if necessary (based on discovered research)
 	for (auto am : saveGame->getAlienMissions())
 	{
-		auto researchName = am->getRules().getInterruptResearch();
+		auto& researchName = am->getRules().getInterruptResearch();
 		if (!researchName.empty())
 		{
-			auto research = mod->getResearch(researchName, true);
+			auto* research = mod->getResearch(researchName, true);
 			if (saveGame->isResearched(research, false)) // ignore debug mode
 			{
 				am->setInterrupted(true);
@@ -3795,14 +3811,7 @@ void GeoscapeState::determineAlienMissions()
 			// 4. generate
 			for (auto eventRules : toBeGenerated)
 			{
-				GeoscapeEvent *newEvent = new GeoscapeEvent(*eventRules);
-				int minutes = (eventRules->getTimer() + (RNG::generate(0, eventRules->getTimerRandom()))) / 30 * 30;
-				if (minutes < 60) minutes = 60; // just in case
-				newEvent->setSpawnCountdown(minutes);
-				_game->getSavedGame()->getGeoscapeEvents().push_back(newEvent);
-
-				// remember that it has been generated
-				save->addGeneratedEvent(eventRules);
+				save->spawnEvent(eventRules);
 			}
 		}
 	}

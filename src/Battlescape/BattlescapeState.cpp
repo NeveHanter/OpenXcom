@@ -1127,6 +1127,8 @@ void BattlescapeState::mapLongPress()
 	{
 		return;
 	}
+	// Remove path preview if necessary
+	_save->getPathfinding()->removePreview();
 	// Proceed with turning the unit.
 	Position pos;
 	BattleUnit *selectedUnit = _save->getSelectedUnit();
@@ -2194,7 +2196,7 @@ void BattlescapeState::drawHandsItems()
 			for (auto& type : typesToCheck)
 			{
 				*emptyHandItemPtr = battleUnit->getSpecialWeapon(type);
-				if (*emptyHandItemPtr && (*emptyHandItemPtr)->getRules()->isSpecialUsingEmptyHand())
+				if (*emptyHandItemPtr && (*emptyHandItemPtr)->getRules()->showSpecialInEmptyHand() && (*emptyHandItemPtr)->getRules()->isSpecialUsingEmptyHand())
 				{
 					break;
 				}
@@ -3125,8 +3127,6 @@ void BattlescapeState::saveAIMap()
 
 	int w = _save->getMapSizeX();
 	int h = _save->getMapSizeY();
-
-	int expMax = 0;
 
 	SDL_Surface *img = SDL_CreateRGBSurface(0, w * 8, h * 8, 24, 0xff, 0xff00, 0xff0000, 0);
 	Log(LOG_INFO) << "unit = " << unit->getId();

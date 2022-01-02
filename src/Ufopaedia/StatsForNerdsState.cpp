@@ -1981,6 +1981,7 @@ void StatsForNerdsState::initItemList()
 		addInteger(ss, itemRule->getDefaultInventorySlotY(), "defaultInvSlotY");
 		addBoolean(ss, itemRule->isFixed(), "fixedWeapon");
 		addBoolean(ss, itemRule->isSpecialUsingEmptyHand(), "specialUseEmptyHand");
+		addBoolean(ss, itemRule->showSpecialInEmptyHand(), "specialUseEmptyHandShow");
 
 		addSection("{Recovery}", "", _white);
 		addBoolean(ss, !itemRule->canBeEquippedBeforeBaseDefense(), "ignoreInBaseDefense"); // negated!
@@ -1995,6 +1996,7 @@ void StatsForNerdsState::initItemList()
 		addInteger(ss, itemRule->getPrisonType(), "prisonType");
 
 		addSection("{Explosives}", "", _white);
+		addInteger(ss, itemRule->getPowerForAnimation(), "powerForAnimation");
 		addBoolean(ss, itemRule->isHiddenOnMinimap(), "hiddenOnMinimap");
 		addSingleString(ss, itemRule->getPrimeActionName(), "primeActionName", "STR_PRIME_GRENADE");
 		addSingleString(ss, itemRule->getPrimeActionMessage(), "primeActionMessage", "STR_GRENADE_IS_ACTIVATED");
