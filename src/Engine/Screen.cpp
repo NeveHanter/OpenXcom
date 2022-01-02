@@ -408,7 +408,14 @@ void Screen::resetDisplay(bool resetVideo, bool noShaders)
 
 		if (!_renderer)
 		{
-			_renderer = new SDLRenderer(_window, -1, SDL_RENDERER_ACCELERATED);
+			if (Options::useSoftwareRenderer)
+			{
+				_renderer = new SDLRenderer(_window, -1, SDL_RENDERER_SOFTWARE);
+			}
+			else
+			{
+				_renderer = new SDLRenderer(_window, -1, SDL_RENDERER_ACCELERATED);
+			}
 			_renderer->setPixelFormat(_surface->format->format);
 		}
 		SDL_Rect baseRect;

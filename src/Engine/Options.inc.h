@@ -11,6 +11,7 @@ OPT bool fullscreen, asyncBlit, playIntro, useScaleFilter, useHQXFilter, useXBRZ
 	rootWindowedMode, lazyLoadResources, backgroundMute;
 // SDL2 scalers
 OPT bool useNearestScaler, useLinearScaler, useAnisotropicScaler;
+OPT bool useSoftwareRenderer;
 
 
 OPT std::string language, useOpenGLShader;

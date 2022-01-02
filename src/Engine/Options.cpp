@@ -173,6 +173,7 @@ void create()
 	_info.push_back(OptionInfo("useNearestScaler", &useNearestScaler, false));
 	_info.push_back(OptionInfo("useLinearScaler", &useLinearScaler, true));
 	_info.push_back(OptionInfo("useAnisotropicScaler", &useAnisotropicScaler, false));
+	_info.push_back(OptionInfo("useSoftwareRenderer", &useSoftwareRenderer, false));
 
 	// advanced options
 #ifdef _WIN32
