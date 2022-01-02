@@ -1127,6 +1127,8 @@ void BattlescapeState::mapLongPress()
 	{
 		return;
 	}
+	// Remove path preview if necessary
+	_save->getPathfinding()->removePreview();
 	// Proceed with turning the unit.
 	Position pos;
 	BattleUnit *selectedUnit = _save->getSelectedUnit();
