@@ -1143,7 +1143,7 @@ void GeoscapeState::time5Seconds()
 							w->setLatitude(u->getLatitude());
 							w->setId(u->getId());
 							(*j)->setDestination(0);
-							popup(new GeoscapeCraftState((*j), _globe, w));
+							popup(new GeoscapeCraftState((*j), _globe, w, false));
 						}
 					}
 					if (u->getStatus() == Ufo::LANDED && (*j)->isInDogfight())
@@ -1605,7 +1605,7 @@ void GeoscapeState::ufoHuntingAndEscorting()
 						(*ufo)->setId(_game->getSavedGame()->getId("STR_UFO"));
 					}
 					// inform the player
-					if ((*ufo)->getRules()->getHuntAlertSound() > -1)
+					if ((*ufo)->getRules()->getHuntAlertSound() != Mod::NO_SOUND)
 					{
 						_game->getMod()->getSound("GEO.CAT", (*ufo)->getRules()->getHuntAlertSound())->play();
 					}
@@ -2105,9 +2105,8 @@ void GeoscapeState::time1Hour()
 				popup(new ErrorMessageState(tr("STR_STORAGE_EXCEEDED").arg((*i)->getName()), _palette, _game->getMod()->getInterface("geoscape")->getElement("errorMessage")->color, "BACK13.SCR", _game->getMod()->getInterface("geoscape")->getElement("errorPalette")->color));
 				popup(new SellState((*i), 0));
 			}
-			else if (!_game->getSavedGame()->getAlienContainmentChecked())
+			if (!_game->getSavedGame()->getAlienContainmentChecked())
 			{
-				_game->getSavedGame()->setAlienContainmentChecked(true);
 				std::map<int, int> prisonTypes;
 				RuleItem *rule = nullptr;
 				for (auto &item : *(*i)->getStorageItems()->getContents())
@@ -2123,7 +2122,6 @@ void GeoscapeState::time1Hour()
 					int prisonType = p.first;
 					if ((*i)->getUsedContainment(prisonType) > (*i)->getAvailableContainment(prisonType))
 					{
-						_game->getSavedGame()->setAlienContainmentChecked(false);
 						timerReset();
 						popup(new ErrorMessageState(
 							trAlt("STR_CONTAINMENT_EXCEEDED", prisonType).arg((*i)->getName()),
@@ -2138,6 +2136,8 @@ void GeoscapeState::time1Hour()
 			}
 		}
 	}
+	_game->getSavedGame()->setAlienContainmentChecked(true); // check only once after reload
+
 	bool postpone = false;
 	for (std::vector<MissionSite*>::iterator i = _game->getSavedGame()->getMissionSites()->begin(); i != _game->getSavedGame()->getMissionSites()->end(); ++i)
 	{
@@ -2823,7 +2823,7 @@ void GeoscapeState::globeClick(Action *action)
 		{
 			// Pass empty vector
 			std::vector<Craft*> crafts;
-			_game->pushState(new MultipleTargetsState(v, crafts, this));
+			_game->pushState(new MultipleTargetsState(v, crafts, this, true));
 		}
 	}
 

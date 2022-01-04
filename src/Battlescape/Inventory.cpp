@@ -1091,6 +1091,7 @@ void Inventory::mouseClick(Action *action, State *state)
 										_warning->showMessage(_game->getLanguage()->getString(item->getRules()->getPrimeActionMessage()));
 										item->setFuseTimer(item->getRules()->getFuseTimerDefault());
 										arrangeGround();
+										playSound(item->getRules()->getPrimeSound()); // prime sound
 									}
 								}
 								else
@@ -1098,6 +1099,7 @@ void Inventory::mouseClick(Action *action, State *state)
 									_warning->showMessage(_game->getLanguage()->getString(item->getRules()->getUnprimeActionMessage()));
 									item->setFuseTimer(-1);  // Unprime the grenade
 									arrangeGround();
+									playSound(item->getRules()->getUnprimeSound()); // unprime sound
 								}
 							}
 						}
@@ -1244,6 +1246,7 @@ bool Inventory::unload(bool quickUnload)
 		{
 			_selItem->setFuseTimer(-1);
 			_warning->showMessage(_game->getLanguage()->getString(_selItem->getRules()->getUnprimeActionMessage()));
+			playSound(_selItem->getRules()->getUnprimeSound()); // unprime sound
 		}
 		else
 		{
@@ -1317,6 +1320,7 @@ bool Inventory::unload(bool quickUnload)
 		{
 			_selItem->setFuseTimer(-1);
 			_warning->showMessage(_game->getLanguage()->getString(_selItem->getRules()->getUnprimeActionMessage()));
+			playSound(_selItem->getRules()->getUnprimeSound()); // unprime sound
 		}
 		else
 		{
@@ -1724,6 +1728,18 @@ void Inventory::animate()
 	drawItems();
 	drawSelectedItem();
 }
+
+/**
+ * Play a sound.
+ */
+void Inventory::playSound(int sound)
+{
+	if (sound != Mod::NO_SOUND)
+	{
+		_game->getMod()->getSoundByDepth(_depth, sound)->play();
+	}
+}
+
 #ifdef __MOBILE__
 void Inventory::mousePress(Action *action, State *state)
 {
