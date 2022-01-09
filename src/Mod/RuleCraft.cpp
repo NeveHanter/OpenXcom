@@ -34,6 +34,8 @@ namespace OpenXcom
  */
 RuleCraft::RuleCraft(const std::string &type) :
 	_type(type), _sprite(-1), _marker(-1), _weapons(0), _soldiers(0), _pilots(0), _vehicles(0),
+	_maxSmallSoldiers(-1), _maxLargeSoldiers(-1), _maxSmallVehicles(-1), _maxLargeVehicles(-1),
+	_maxSmallUnits(-1), _maxLargeUnits(-1), _maxSoldiers(-1), _maxVehicles(-1),
 	_costBuy(0), _costRent(0), _costSell(0), _repairRate(1), _refuelRate(1),
 	_transferTime(24), _score(0), _battlescapeTerrainData(0), _maxSkinIndex(0),
 	_keepCraftAfterFailedMission(false), _allowLanding(true), _spacecraft(false), _notifyWhenRefueled(false), _autoPatrol(false), _undetectable(false),
@@ -109,6 +111,14 @@ void RuleCraft::load(const YAML::Node &node, Mod *mod, int listOrder, const ModS
 	_soldiers = node["soldiers"].as<int>(_soldiers);
 	_pilots = node["pilots"].as<int>(_pilots);
 	_vehicles = node["vehicles"].as<int>(_vehicles);
+	_maxSmallSoldiers = node["maxSmallSoldiers"].as<int>(_maxSmallSoldiers);
+	_maxLargeSoldiers = node["maxLargeSoldiers"].as<int>(_maxLargeSoldiers);
+	_maxSmallVehicles = node["maxSmallVehicles"].as<int>(_maxSmallVehicles);
+	_maxLargeVehicles = node["maxLargeVehicles"].as<int>(_maxLargeVehicles);
+	_maxSmallUnits = node["maxSmallUnits"].as<int>(_maxSmallUnits);
+	_maxLargeUnits = node["maxLargeUnits"].as<int>(_maxLargeUnits);
+	_maxSoldiers = node["maxSoldiers"].as<int>(_maxSoldiers);
+	_maxVehicles = node["maxVehicles"].as<int>(_maxVehicles);
 	_costBuy = node["costBuy"].as<int>(_costBuy);
 	_costRent = node["costRent"].as<int>(_costRent);
 	_costSell = node["costSell"].as<int>(_costSell);
@@ -285,11 +295,11 @@ int RuleCraft::getWeapons() const
 }
 
 /**
- * Gets the maximum number of soldiers that
+ * Gets the maximum number of units (soldiers and vehicles, small and large) that
  * the craft can carry.
- * @return The soldier capacity.
+ * @return The maximum unit capacity.
  */
-int RuleCraft::getSoldiers() const
+int RuleCraft::getMaxUnits() const
 {
 	return _soldiers;
 }
@@ -304,11 +314,11 @@ int RuleCraft::getPilots() const
 }
 
 /**
- * Gets the maximum number of vehicles that
+ * Gets the maximum number of vehicles (and 2x2 soldiers) that
  * the craft can carry.
- * @return The vehicle capacity.
+ * @return The maximum vehicle capacity (incl. 2x2 soldiers).
  */
-int RuleCraft::getVehicles() const
+int RuleCraft::getMaxVehiclesAndLargeSoldiers() const
 {
 	return _vehicles;
 }
@@ -744,8 +754,8 @@ void RuleCraft::ScriptRegister(ScriptParserBase* parser)
 	b.add<&getTypeScript>("getType");
 
 	b.add<&RuleCraft::getWeapons>("getWeaponsMax");
-	b.add<&RuleCraft::getSoldiers>("getSoldiersMax");
-	b.add<&RuleCraft::getVehicles>("getVehiclesMax");
+	b.add<&RuleCraft::getMaxUnits>("getSoldiersMax");
+	b.add<&RuleCraft::getMaxVehiclesAndLargeSoldiers>("getVehiclesMax");
 	b.add<&RuleCraft::getPilots>("getPilotsMax");
 
 	RuleCraftStats::addGetStatsScript<&RuleCraft::_stats>(b, "Stats.");

@@ -1105,7 +1105,7 @@ void GeoscapeState::time5Seconds()
 					}
 				}
 				// if a transport craft has been shot down, kill all the soldiers on board.
-				if ((*j)->getRules()->getSoldiers() > 0)
+				if ((*j)->getRules()->getMaxUnits() > 0)
 				{
 					for (std::vector<Soldier*>::iterator k = (*i)->getSoldiers()->begin(); k != (*i)->getSoldiers()->end();)
 					{
@@ -1292,7 +1292,7 @@ void GeoscapeState::time5Seconds()
 					case Ufo::LANDED:
 					case Ufo::CRASHED:
 					case Ufo::DESTROYED: // Just before expiration
-						if (((*j)->getNumSoldiers() > 0 || (*j)->getNumVehicles() > 0) && (*j)->getRules()->getAllowLanding())
+						if ((*j)->getNumTotalUnits() > 0 && (*j)->getRules()->getAllowLanding())
 						{
 							if (!(*j)->isInDogfight())
 							{
@@ -1321,7 +1321,7 @@ void GeoscapeState::time5Seconds()
 				}
 				else if (m != 0)
 				{
-					if (((*j)->getNumSoldiers() > 0 || (*j)->getNumVehicles() > 0) && (*j)->getRules()->getAllowLanding())
+					if ((*j)->getNumTotalUnits() > 0 && (*j)->getRules()->getAllowLanding())
 					{
 						// look up polygons texture
 						int texture, shade;
@@ -1344,7 +1344,7 @@ void GeoscapeState::time5Seconds()
 				{
 					if (b->isDiscovered())
 					{
-						if (((*j)->getNumSoldiers() > 0 || (*j)->getNumVehicles() > 0) && (*j)->getRules()->getAllowLanding())
+						if ((*j)->getNumTotalUnits() > 0 && (*j)->getRules()->getAllowLanding())
 						{
 							int texture, shade;
 							_globe->getPolygonTextureAndShade(b->getLongitude(), b->getLatitude(), &texture, &shade);
@@ -1751,6 +1751,11 @@ bool GeoscapeState::processMissionSite(MissionSite *site)
 		// Unlock research defined in alien deployment, if the mission site despawned
 		const RuleResearch* research = _game->getMod()->getResearch(site->getDeployment()->getUnlockedResearchOnDespawn());
 		_game->getSavedGame()->handleResearchUnlockedByMissions(research, _game->getMod());
+
+		// Increase counters
+		_game->getSavedGame()->increaseCustomCounter(site->getDeployment()->getCounterDespawn());
+		_game->getSavedGame()->increaseCustomCounter(site->getDeployment()->getCounterFailure()); // despawn is also a type of failure
+		_game->getSavedGame()->increaseCustomCounter(site->getDeployment()->getCounterAll());
 
 		// Generate a despawn event
 		auto eventRules = _game->getMod()->getEvent(site->getDeployment()->chooseDespawnEvent());
@@ -2453,54 +2458,11 @@ void GeoscapeState::time1Day()
 			{
 				topicsToCheck.push_back(bonus);
 			}
-			for (auto *myResearchRule : topicsToCheck)
-			{
-				// 3j. now iterate through all the bases and remove this project from their labs (unless it can still yield more stuff!)
-				for (Base *otherBase : *saveGame->getBases())
-				{
-					for (ResearchProject *otherProject : otherBase->getResearch())
-					{
-						if (myResearchRule == otherProject->getRules())
-						{
-							if (saveGame->hasUndiscoveredGetOneFree(myResearchRule, true))
-							{
-								// This research topic still has some more undiscovered non-disabled and *AVAILABLE* "getOneFree" topics, keep it!
-							}
-							else if (saveGame->hasUndiscoveredProtectedUnlock(myResearchRule, mod))
-							{
-								// This research topic still has one or more undiscovered non-disabled "protected unlocks", keep it!
-							}
-							else
-							{
-								// This topic can't give you anything else anymore, remove it!
-								otherBase->removeResearch(otherProject);
-								break;
-							}
-						}
-					}
-				}
-				// 3k. handle spawned items
-				RuleItem* spawnedItem = _game->getMod()->getItem(myResearchRule->getSpawnedItem());
-				if (spawnedItem)
-				{
-					Transfer* t = new Transfer(1);
-					t->setItems(myResearchRule->getSpawnedItem(), std::max(1, myResearchRule->getSpawnedItemCount()));
-					base->getTransfers()->push_back(t);
-				}
-				for (auto& spawnedItemName2 : myResearchRule->getSpawnedItemList())
-				{
-					RuleItem* spawnedItem2 = _game->getMod()->getItem(spawnedItemName2);
-					if (spawnedItem2)
-					{
-						Transfer* t = new Transfer(1);
-						t->setItems(spawnedItemName2);
-						base->getTransfers()->push_back(t);
-					}
-				}
-				// 3l. handle spawned events
-				RuleEvent* spawnedEventRule = _game->getMod()->getEvent(myResearchRule->getSpawnedEvent());
-				saveGame->spawnEvent(spawnedEventRule);
-			}
+			// Side effects:
+			// 1. remove obsolete research projects from all bases
+			// 2. handle items spawned by research
+			// 3. handle events spawned by research
+			saveGame->handlePrimaryResearchSideEffects(topicsToCheck, _game->getMod(), base);
 		}
 
 		// Handle soldier wounds and martial training
@@ -2853,7 +2815,7 @@ void GeoscapeState::btnInterceptClick(Action *)
 	{
 		return;
 	}
-	_game->pushState(new InterceptState(_globe));
+	_game->pushState(new InterceptState(_globe, false));
 }
 
 /**
@@ -3444,6 +3406,32 @@ void GeoscapeState::determineAlienMissions()
 				}
 				if (triggerHappy)
 				{
+					// check counters
+					if (arcScript->getCounterMin() > 0)
+					{
+						if (!arcScript->getMissionVarName().empty() && arcScript->getCounterMin() > strategy.getMissionsRun(arcScript->getMissionVarName()))
+						{
+							triggerHappy = false;
+						}
+						if (!arcScript->getMissionMarkerName().empty() && arcScript->getCounterMin() > save->getLastId(arcScript->getMissionMarkerName()))
+						{
+							triggerHappy = false;
+						}
+					}
+					if (triggerHappy && arcScript->getCounterMax() != -1)
+					{
+						if (!arcScript->getMissionVarName().empty() && arcScript->getCounterMax() < strategy.getMissionsRun(arcScript->getMissionVarName()))
+						{
+							triggerHappy = false;
+						}
+						if (!arcScript->getMissionMarkerName().empty() && arcScript->getCounterMax() < save->getLastId(arcScript->getMissionMarkerName()))
+						{
+							triggerHappy = false;
+						}
+					}
+				}
+				if (triggerHappy)
+				{
 					// item requirements
 					for (auto &triggerItem : arcScript->getItemTriggers())
 					{
@@ -3589,6 +3577,32 @@ void GeoscapeState::determineAlienMissions()
 			}
 			if (triggerHappy)
 			{
+				// check counters
+				if (command->getCounterMin() > 0)
+				{
+					if (!command->getMissionVarName().empty() && command->getCounterMin() > strategy.getMissionsRun(command->getMissionVarName()))
+					{
+						triggerHappy = false;
+					}
+					if (!command->getMissionMarkerName().empty() && command->getCounterMin() > save->getLastId(command->getMissionMarkerName()))
+					{
+						triggerHappy = false;
+					}
+				}
+				if (triggerHappy && command->getCounterMax() != -1)
+				{
+					if (!command->getMissionVarName().empty() && command->getCounterMax() < strategy.getMissionsRun(command->getMissionVarName()))
+					{
+						triggerHappy = false;
+					}
+					if (!command->getMissionMarkerName().empty() && command->getCounterMax() < save->getLastId(command->getMissionMarkerName()))
+					{
+						triggerHappy = false;
+					}
+				}
+			}
+			if (triggerHappy)
+			{
 				// item requirements
 				for (auto &triggerItem : command->getItemTriggers())
 				{
@@ -3699,8 +3713,6 @@ void GeoscapeState::determineAlienMissions()
 				(month < 1 || eventScript->getMaxScore() >= currentScore) &&
 				(month < 1 || eventScript->getMinFunds() <= currentFunds) &&
 				(month < 1 || eventScript->getMaxFunds() >= currentFunds) &&
-				(eventScript->getMissionMinRuns() == 0  || eventScript->getMissionMinRuns() <= strategy.getMissionsRun(eventScript->getMissionVarName())) &&
-				(eventScript->getMissionMaxRuns() == -1 || eventScript->getMissionMaxRuns() >= strategy.getMissionsRun(eventScript->getMissionVarName())) &&
 				eventScript->getMinDifficulty() <= save->getDifficulty() &&
 				eventScript->getMaxDifficulty() >= save->getDifficulty())
 			{
@@ -3711,6 +3723,32 @@ void GeoscapeState::determineAlienMissions()
 					triggerHappy = (save->isResearched(trigger.first) == trigger.second);
 					if (!triggerHappy)
 						break;
+				}
+				if (triggerHappy)
+				{
+					// check counters
+					if (eventScript->getCounterMin() > 0)
+					{
+						if (!eventScript->getMissionVarName().empty() && eventScript->getCounterMin() > strategy.getMissionsRun(eventScript->getMissionVarName()))
+						{
+							triggerHappy = false;
+						}
+						if (!eventScript->getMissionMarkerName().empty() && eventScript->getCounterMin() > save->getLastId(eventScript->getMissionMarkerName()))
+						{
+							triggerHappy = false;
+						}
+					}
+					if (triggerHappy && eventScript->getCounterMax() != -1)
+					{
+						if (!eventScript->getMissionVarName().empty() && eventScript->getCounterMax() < strategy.getMissionsRun(eventScript->getMissionVarName()))
+						{
+							triggerHappy = false;
+						}
+						if (!eventScript->getMissionMarkerName().empty() && eventScript->getCounterMax() < save->getLastId(eventScript->getMissionMarkerName()))
+						{
+							triggerHappy = false;
+						}
+					}
 				}
 				if (triggerHappy)
 				{

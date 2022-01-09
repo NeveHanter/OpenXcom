@@ -1007,6 +1007,64 @@ const std::vector<std::vector<Uint8> > *Mod::getLUTs() const
 }
 
 
+/**
+ * Veryfy if value have defined surface in given set.
+ */
+void Mod::verifySpriteOffset(const std::string &parent, const int& sprite, const std::string &set) const
+{
+	if (Options::lazyLoadResources)
+	{
+		// we can't check if index is correct when set is loaded
+		return;
+	}
+
+	auto* s = getRule(set, "Sprite Set", _sets, true);
+
+	checkForSoftError(sprite != Mod::NO_SURFACE && s->getFrame(sprite) == nullptr, parent, "Wrong index " + std::to_string(sprite) + " for surface set " + set, LOG_ERROR);
+}
+
+/**
+ * Veryfy if value have defined surface in given set.
+ */
+void Mod::verifySpriteOffset(const std::string &parent, const std::vector<int>& sprites, const std::string &set) const
+{
+	if (Options::lazyLoadResources)
+	{
+		// we can't check if index is correct when set is loaded
+		return;
+	}
+
+	auto* s = getRule(set, "Sprite Set", _sets, true);
+
+	for (auto sprite : sprites)
+	{
+		checkForSoftError(sprite != Mod::NO_SURFACE && s->getFrame(sprite) == nullptr, parent, "Wrong index " + std::to_string(sprite) + " for surface set " + set, LOG_ERROR);
+	}
+}
+
+/**
+ * Veryfy if value have defined sound in given set.
+ */
+void Mod::verifySoundOffset(const std::string &parent, const int& sound, const std::string &set) const
+{
+	auto* s = getSoundSet(set);
+
+	checkForSoftError(sound != Mod::NO_SOUND && s->getSound(sound) == nullptr, parent, "Wrong index " + std::to_string(sound) + " for sound set " + set, LOG_ERROR);
+}
+
+/**
+ * Veryfy if value have defined sound in given set.
+ */
+void Mod::verifySoundOffset(const std::string &parent, const std::vector<int>& sounds, const std::string &set) const
+{
+	auto* s = getSoundSet(set);
+
+	for (auto sound : sounds)
+	{
+		checkForSoftError(sound != Mod::NO_SOUND && s->getSound(sound) == nullptr, parent, "Wrong index " + std::to_string(sound) + " for sound set " + set, LOG_ERROR);
+	}
+}
+
 
 /**
  * Returns the current mod-based offset for resources.
@@ -1433,6 +1491,9 @@ void Mod::loadOffsetNode(const std::string &parent, int& offset, const YAML::Nod
 		throw LoadRuleException(parent, node, "unsupported yaml node");
 	}
 
+	static_assert(Mod::NO_SOUND == -1, "NO_SOUND need to equal -1");
+	static_assert(Mod::NO_SURFACE == -1, "NO_SURFACE need to equal -1");
+
 	if (offset < -1)
 	{
 		std::ostringstream err;
@@ -1493,9 +1554,9 @@ void Mod::loadSpriteOffset(const std::string &parent, std::vector<int>& sprites,
 		{
 			for (YAML::const_iterator i = node.begin(); i != node.end(); ++i)
 			{
-				sprites.push_back(-1);
+				sprites.push_back(Mod::NO_SURFACE);
 				loadOffsetNode(parent, sprites.back(), *i, maxShared, set, 1);
-				if (checkForSoftError(sprites.back() == -1, parent, *i, "incorrect value in sprite list"))
+				if (checkForSoftError(sprites.back() == Mod::NO_SURFACE, parent, *i, "incorrect value in sprite list"))
 				{
 					sprites.pop_back();
 				}
@@ -1503,7 +1564,7 @@ void Mod::loadSpriteOffset(const std::string &parent, std::vector<int>& sprites,
 		}
 		else
 		{
-			sprites.push_back(-1);
+			sprites.push_back(Mod::NO_SURFACE);
 			loadOffsetNode(parent, sprites.back(), node, maxShared, set, 1);
 		}
 	}
@@ -2011,6 +2072,11 @@ void Mod::loadAll()
 		}
 	}
 
+
+	loadExtraResources();
+
+
+	Log(LOG_INFO) << "After load.";
 	// cross link rule objects
 
 	afterLoadHelper("research", this, _research, &RuleResearch::afterLoad);
@@ -2146,7 +2212,6 @@ void Mod::loadAll()
 	Log(LOG_INFO) << "Loading ended.";
 
 	sortLists();
-	loadExtraResources();
 	modResources();
 }
 
@@ -2818,6 +2883,8 @@ void Mod::loadFile(const FileMap::FileRecord &filerec, ModScript &parsers)
 		if ((*i)["annoyedSound"])
 			loadSoundOffset(type, _annoyedSound[type], (*i)["annoyedSound"], "BATTLE.CAT");
 	}
+	loadSoundOffset("global", _selectBaseSound, doc["selectBaseSound"], "BATTLE.CAT");
+	loadSoundOffset("global", _startDogfightSound, doc["startDogfightSound"], "BATTLE.CAT");
 	_flagByKills = doc["flagByKills"].as<std::vector<int> >(_flagByKills);
 
 	_defeatScore = doc["defeatScore"].as<int>(_defeatScore);
@@ -3317,7 +3384,7 @@ SavedGame *Mod::newSave(GameDifficulty diff) const
 				Craft *found = 0;
 				for (auto& craft : *base->getCrafts())
 				{
-					if (!found && craft->getRules()->getAllowLanding() && craft->getSpaceUsed() < craft->getRules()->getSoldiers())
+					if (!found && craft->getRules()->getAllowLanding() && craft->getSpaceUsed() < craft->getRules()->getMaxUnits())
 					{
 						// Remember transporter as fall-back, but search further for interceptors
 						found = craft;
@@ -3335,7 +3402,7 @@ SavedGame *Mod::newSave(GameDifficulty diff) const
 				Craft *found = 0;
 				for (auto& craft : *base->getCrafts())
 				{
-					if (craft->getRules()->getAllowLanding() && craft->getSpaceUsed() < craft->getRules()->getSoldiers())
+					if (craft->getRules()->getAllowLanding() && craft->getSpaceUsed() < craft->getRules()->getMaxUnits())
 					{
 						// First available transporter will do
 						found = craft;

@@ -578,7 +578,17 @@ Ufo *AlienMission::spawnUfo(SavedGame &game, const Mod &mod, const Globe &globe,
 		ufo->setLatitude(_base->getLatitude());
 	}
 	Waypoint *wp = new Waypoint();
-	pos = getWaypoint(wave, trajectory, 1, globe, regionRules, *ufo);
+	if (trajectory.getWaypointCount() > 1)
+	{
+		pos = getWaypoint(wave, trajectory, 1, globe, regionRules, *ufo);
+	}
+	else
+	{
+		std::stringstream ss;
+		ss << "Missing second waypoint! Error occurred while trying to determine UFO waypoint for mission type: " << _rule.getType();
+		ss << " in region: " << regionRules.getType() << "; ufo type: " << ufo->getRules()->getType() << ", trajectory ID: " << trajectory.getID() << ".";
+		throw Exception(ss.str());
+	}
 	wp->setLongitude(pos.first);
 	wp->setLatitude(pos.second);
 	ufo->setDestination(wp);
@@ -813,7 +823,7 @@ void AlienMission::ufoReachedWaypoint(Ufo &ufo, Game &engine, const Globe &globe
 				std::vector<Craft*> followers = ufo.getCraftFollowers();
 				for (std::vector<Craft*>::iterator c = followers.begin(); c != followers.end(); ++c)
 				{
-					if ((*c)->getNumSoldiers() != 0)
+					if ((*c)->getNumTotalUnits() > 0)
 					{
 						(*c)->setDestination(missionSite);
 					}

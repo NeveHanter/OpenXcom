@@ -236,6 +236,10 @@ public:
 	void setTime(const GameTime& time);
 	/// Gets the current ID for an object.
 	int getId(const std::string &name);
+	/// Gets the last ID for an object.
+	int getLastId(const std::string& name);
+	/// Increase a custom counter.
+	void increaseCustomCounter(const std::string& name);
 	/// Resets the list of object IDs.
 	const std::map<std::string, int> &getAllIds() const;
 	/// Resets the list of object IDs.
@@ -472,6 +476,8 @@ public:
 	bool canSpawnInstantEvent(const RuleEvent* eventRules);
 	/// Handles research unlocked by successful/failed missions and despawned mission sites.
 	bool handleResearchUnlockedByMissions(const RuleResearch* research, const Mod* mod);
+	/// Handles research side effects for primary research sources.
+	void handlePrimaryResearchSideEffects(const std::vector<const RuleResearch*> &topicsToCheck, const Mod* mod, Base* base);
 	/// Gets the list of user notes.
 	std::vector<std::string>& getUserNotes() { return _userNotes; }
 };
