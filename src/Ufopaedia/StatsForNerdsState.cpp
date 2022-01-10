@@ -2256,6 +2256,36 @@ void StatsForNerdsState::addArmorDamageModifiers(std::ostringstream &ss, const s
 }
 
 /**
+ * Adds a SpecialAbility to the table.
+ */
+void StatsForNerdsState::addSpecialAbility(std::ostringstream &ss, const SpecialAbility &value, const std::string &propertyName, const SpecialAbility &defaultvalue)
+{
+	if (value == defaultvalue && !_showDefaults)
+	{
+		return;
+	}
+	resetStream(ss);
+	switch (value)
+	{
+	case SPECAB_NONE: ss << tr("SPECAB_NONE"); break;
+	case SPECAB_EXPLODEONDEATH: ss << tr("SPECAB_EXPLODEONDEATH"); break;
+	case SPECAB_BURNFLOOR: ss << tr("SPECAB_BURNFLOOR"); break;
+	case SPECAB_BURN_AND_EXPLODE: ss << tr("SPECAB_BURN_AND_EXPLODE"); break;
+	default: ss << tr("STR_UNKNOWN"); break;
+	}
+	if (_showIds)
+	{
+		ss << " [" << value << "]";
+	}
+	_lstRawData->addRow(2, trp(propertyName).c_str(), ss.str().c_str());
+	++_counter;
+	if (value != defaultvalue)
+	{
+		_lstRawData->setCellColor(_lstRawData->getLastRowIndex(), 1, _pink);
+	}
+}
+
+/**
  * Adds a MovementType to the table.
  */
 void StatsForNerdsState::addMovementType(std::ostringstream &ss, const MovementType &value, const std::string &propertyName, const MovementType &defaultvalue)
@@ -2397,6 +2427,7 @@ void StatsForNerdsState::initArmorList()
 
 	addInteger(ss, armorRule->getSize(), "size", 1);
 
+	addSpecialAbility(ss, (SpecialAbility)armorRule->getSpecialAbility(), "specab");
 	addMovementType(ss, armorRule->getMovementType(), "movementType");
 
 	addBoolean(ss, armorRule->allowsRunning(), "allowsRunning", true);
@@ -2872,9 +2903,19 @@ void StatsForNerdsState::initCraftList()
 	addInteger(ss, craftRule->getSellCost(), "costSell", 0, true);
 	addInteger(ss, craftRule->getTransferTime(), "transferTime", 24);
 
-	addInteger(ss, craftRule->getSoldiers(), "soldiers");
+	addInteger(ss, craftRule->getMaxUnits(), "soldiers");
 	addInteger(ss, craftRule->getPilots(), "pilots");
-	addInteger(ss, craftRule->getVehicles(), "vehicles");
+	addInteger(ss, craftRule->getMaxVehiclesAndLargeSoldiers(), "vehicles");
+
+	addInteger(ss, craftRule->getMaxSmallSoldiers(), "maxSmallSoldiers", -1);
+	addInteger(ss, craftRule->getMaxLargeSoldiers(), "maxLargeSoldiers", -1);
+	addInteger(ss, craftRule->getMaxSmallVehicles(), "maxSmallVehicles", -1);
+	addInteger(ss, craftRule->getMaxLargeVehicles(), "maxLargeVehicles", -1);
+	addInteger(ss, craftRule->getMaxSmallUnits(), "maxSmallUnits", -1);
+	addInteger(ss, craftRule->getMaxLargeUnits(), "maxLargeUnits", -1);
+	addInteger(ss, craftRule->getMaxSoldiers(), "maxSoldiers", -1);
+	addInteger(ss, craftRule->getMaxVehicles(), "maxVehicles", -1);
+
 	addInteger(ss, craftRule->getMaxItems(), "maxItems");
 	addDouble(ss, craftRule->getMaxStorageSpace(), "maxStorageSpace");
 
@@ -3038,9 +3079,9 @@ void StatsForNerdsState::initCraftList()
 
 		addSection("{Sounds}", "", _white);
 		addVectorOfIntegers(ss, craftRule->getSelectSoundRaw(), "selectSound");
-		addSoundVectorResourcePaths(ss, mod, "BATTLE.CAT", craftRule->getSelectSoundRaw());
+		addSoundVectorResourcePaths(ss, mod, "GEO.CAT", craftRule->getSelectSoundRaw());
 		addVectorOfIntegers(ss, craftRule->getTakeoffSoundRaw(), "takeoffSound");
-		addSoundVectorResourcePaths(ss, mod, "BATTLE.CAT", craftRule->getTakeoffSoundRaw());
+		addSoundVectorResourcePaths(ss, mod, "GEO.CAT", craftRule->getTakeoffSoundRaw());
 
 		addSection("{Battlescape}", "", _white);
 		addBoolean(ss, craftRule->getBattlescapeTerrainData() != 0, "battlescapeTerrainData", false); // just say if there is any or not
@@ -3254,6 +3295,7 @@ void StatsForNerdsState::initUfoList()
 		addSingleString(ss, ufoRule->getType(), "type");
 
 		addSection("{Exotic}", "", _white);
+		addInteger(ss, ufoRule->getSoftlockThreshold(), "softlockThreshold", 100);
 		addInteger(ss, ufoRule->getMissilePower(), "missilePower");
 		addBoolean(ss, ufoRule->isUnmanned(), "unmanned");
 		addInteger(ss, ufoRule->getSplashdownSurvivalChance(), "splashdownSurvivalChance", 100);

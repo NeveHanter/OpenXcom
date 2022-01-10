@@ -1234,6 +1234,44 @@ int SavedGame::getId(const std::string &name)
 }
 
 /**
+ * Returns the last used ID for the specified object.
+ * @param name Object name.
+ * @return Last used ID number.
+ */
+int SavedGame::getLastId(const std::string& name)
+{
+	std::map<std::string, int>::iterator i = _ids.find(name);
+	if (i != _ids.end())
+	{
+		return std::max(1, i->second - 1);
+	}
+	else
+	{
+		return 0;
+	}
+}
+
+/**
+ * Increase a custom counter.
+ * @param name Counter name.
+ */
+void SavedGame::increaseCustomCounter(const std::string& name)
+{
+	if (!name.empty())
+	{
+		std::map<std::string, int>::iterator i = _ids.find(name);
+		if (i != _ids.end())
+		{
+			i->second++;
+		}
+		else
+		{
+			_ids[name] = 2; // not a typo
+		}
+	}
+}
+
+/**
 * Resets the list of unique object IDs.
 * @param ids New ID list.
 */
@@ -2940,10 +2978,18 @@ bool SavedGame::isUfoOnIgnoreList(int ufoId)
  */
 std::vector<Soldier*>::iterator SavedGame::killSoldier(const Mod* mod, Soldier *soldier, BattleUnitKills *cause)
 {
-	// OXCE: soldiers are buried in their default armor (...nicer stats in the Memorial GUI; no free armor if resurrected)
-	soldier->setArmor(mod->getArmor(soldier->getRules()->getArmor()));
-	soldier->setReplacedArmor(0);
-	soldier->setTransformedArmor(0);
+	if (mod)
+	{
+		// OXCE: soldiers are buried in their default armor (...nicer stats in the Memorial GUI; no free armor if resurrected)
+		soldier->setArmor(mod->getArmor(soldier->getRules()->getArmor()));
+		soldier->setReplacedArmor(0);
+		soldier->setTransformedArmor(0);
+	}
+	else
+	{
+		// IMPORTANT: don't change the geoscape armor during the ongoing battle!
+		// battlescape armor would reset to geoscape armor after save and reload
+	}
 
 	std::vector<Soldier*>::iterator j;
 	for (std::vector<Base*>::const_iterator i = _bases.begin(); i != _bases.end(); ++i)
@@ -3243,6 +3289,61 @@ bool SavedGame::handleResearchUnlockedByMissions(const RuleResearch* research, c
 	}
 
 	return true;
+}
+
+/**
+ * Handles research side effects for primary research sources.
+ */
+void SavedGame::handlePrimaryResearchSideEffects(const std::vector<const RuleResearch*> &topicsToCheck, const Mod* mod, Base* base)
+{
+	for (auto* myResearchRule : topicsToCheck)
+	{
+		// 3j. now iterate through all the bases and remove this project from their labs (unless it can still yield more stuff!)
+		for (Base* otherBase : _bases)
+		{
+			for (ResearchProject* otherProject : otherBase->getResearch())
+			{
+				if (myResearchRule == otherProject->getRules())
+				{
+					if (hasUndiscoveredGetOneFree(myResearchRule, true))
+					{
+						// This research topic still has some more undiscovered non-disabled and *AVAILABLE* "getOneFree" topics, keep it!
+					}
+					else if (hasUndiscoveredProtectedUnlock(myResearchRule, mod))
+					{
+						// This research topic still has one or more undiscovered non-disabled "protected unlocks", keep it!
+					}
+					else
+					{
+						// This topic can't give you anything else anymore, remove it!
+						otherBase->removeResearch(otherProject);
+						break;
+					}
+				}
+			}
+		}
+		// 3k. handle spawned items
+		RuleItem* spawnedItem = mod->getItem(myResearchRule->getSpawnedItem());
+		if (spawnedItem)
+		{
+			Transfer* t = new Transfer(1);
+			t->setItems(myResearchRule->getSpawnedItem(), std::max(1, myResearchRule->getSpawnedItemCount()));
+			base->getTransfers()->push_back(t);
+		}
+		for (auto& spawnedItemName2 : myResearchRule->getSpawnedItemList())
+		{
+			RuleItem* spawnedItem2 = mod->getItem(spawnedItemName2);
+			if (spawnedItem2)
+			{
+				Transfer* t = new Transfer(1);
+				t->setItems(spawnedItemName2);
+				base->getTransfers()->push_back(t);
+			}
+		}
+		// 3l. handle spawned events
+		RuleEvent* spawnedEventRule = mod->getEvent(myResearchRule->getSpawnedEvent());
+		spawnEvent(spawnedEventRule);
+	}
 }
 
 ////////////////////////////////////////////////////////////
