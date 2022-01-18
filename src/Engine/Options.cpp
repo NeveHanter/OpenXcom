@@ -441,6 +441,7 @@ void create()
 	_info.push_back(KeyOptionInfo("keyInvLoadPersonalEquipment", &keyInvLoadPersonalEquipment, SDLK_l, "STR_LOAD_PERSONAL_EQUIPMENT", "STR_OXCE"));
 	_info.push_back(KeyOptionInfo("keyInvShowPersonalEquipment", &keyInvShowPersonalEquipment, SDLK_p, "STR_PERSONAL_EQUIPMENT", "STR_OXCE"));
 
+	_info.push_back(KeyOptionInfo("keyBattleShowLayers", &keyBattleShowLayers, SDLK_UNKNOWN, "STR_MULTI_LEVEL_VIEW", "STR_OXCE"));
 	_info.push_back(KeyOptionInfo("keyBattleUseSpecial", &keyBattleUseSpecial, SDLK_w, "STR_USE_SPECIAL_ITEM", "STR_OXCE"));
 	_info.push_back(KeyOptionInfo("keyBattleActionItem1", &keyBattleActionItem1, SDLK_1, "STR_ACTION_ITEM_1", "STR_OXCE"));
 	_info.push_back(KeyOptionInfo("keyBattleActionItem2", &keyBattleActionItem2, SDLK_2, "STR_ACTION_ITEM_2", "STR_OXCE"));
@@ -895,10 +896,27 @@ void updateMods()
 	FileMap::clear(false, Options::oxceEmbeddedOnly);
 
 	refreshMods();
-	FileMap::setup(getActiveMods(), Options::oxceEmbeddedOnly);
+
+	// check active mods that don't meet the enforced OXCE requirements
+	auto activeModsList = getActiveMods();
+	bool forceQuit = false;
+	for (auto modInf : activeModsList)
+	{
+		if (!modInf->isEnforcedVersionOk())
+		{
+			forceQuit = true;
+			Log(LOG_ERROR) << "- " << modInf->getId() << " v" << modInf->getVersion();
+			Log(LOG_ERROR) << "Mod '" << modInf->getName() << "' enforces at least OXCE v" << modInf->getEnforcedExtendedVersion();
+		}
+	}
+	if (forceQuit)
+	{
+		throw Exception("Incompatible mods are active. Please upgrade OpenXcom.");
+	}
+
+	FileMap::setup(activeModsList, Options::oxceEmbeddedOnly);
 	userSplitMasters();
 
-	// report active mods that don't meet the minimum OXCE requirements
 	Log(LOG_INFO) << "Active mods:";
 	auto activeMods = getActiveMods();
 	for (auto modInf : activeMods)
@@ -906,6 +924,7 @@ void updateMods()
 		Log(LOG_INFO) << "- " << modInf->getId() << " v" << modInf->getVersion();
 		if (!modInf->isVersionOk())
 		{
+			// report active mods that don't meet the recommended OXCE requirements
 			Log(LOG_ERROR) << "Mod '" << modInf->getName() << "' requires at least OXCE v" << modInf->getRequiredExtendedVersion();
 		}
 	}

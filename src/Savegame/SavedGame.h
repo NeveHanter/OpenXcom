@@ -113,8 +113,11 @@ struct PromotionInfo
 class SavedGame
 {
 public:
+	Country *debugCountry = nullptr;
 	Region *debugRegion = nullptr;
-	int debugZone = 0;
+	int debugType = 0;
+	size_t debugZone = 0;
+	size_t debugArea = 0;
 
 	/// Name of class used in script.
 	static constexpr const char *ScriptName = "GeoscapeGame";
@@ -240,6 +243,8 @@ public:
 	int getLastId(const std::string& name);
 	/// Increase a custom counter.
 	void increaseCustomCounter(const std::string& name);
+	/// Decrease a custom counter.
+	void decreaseCustomCounter(const std::string& name);
 	/// Resets the list of object IDs.
 	const std::map<std::string, int> &getAllIds() const;
 	/// Resets the list of object IDs.

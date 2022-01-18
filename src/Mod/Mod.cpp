@@ -165,7 +165,7 @@ const std::string ModNameMaster = "master";
 const std::string ModNameCurrent = "current";
 
 /// Reduction of size allocated for transparency LUTs.
-const size_t ModTransparceySizeReduction = 100;
+const size_t ModTransparencySizeReduction = 100;
 
 void Mod::resetGlobalStatics()
 {
@@ -1020,6 +1020,13 @@ void Mod::verifySpriteOffset(const std::string &parent, const int& sprite, const
 
 	auto* s = getRule(set, "Sprite Set", _sets, true);
 
+	if (s->getTotalFrames() == 0)
+	{
+		//HACK: some sprites should be shared betwean diffret sets but in some cases one set is not used, if there is no surfaces this mean this index is not used
+		// in some corner cases it will not work correcty, like if someone do not add any surface
+		return;
+	}
+
 	checkForSoftError(sprite != Mod::NO_SURFACE && s->getFrame(sprite) == nullptr, parent, "Wrong index " + std::to_string(sprite) + " for surface set " + set, LOG_ERROR);
 }
 
@@ -1035,6 +1042,13 @@ void Mod::verifySpriteOffset(const std::string &parent, const std::vector<int>& 
 	}
 
 	auto* s = getRule(set, "Sprite Set", _sets, true);
+
+	if (s->getTotalFrames() == 0)
+	{
+		//HACK: some sprites should be shared betwean diffret sets but in some cases one set is not used, if there is no surfaces this mean this index is not used
+		// in some corner cases it will not work correcty, like if someone do not add any surface
+		return;
+	}
 
 	for (auto sprite : sprites)
 	{
@@ -1629,7 +1643,7 @@ void Mod::loadTransparencyOffset(const std::string &parent, int& index, const YA
 {
 	if (node)
 	{
-		loadOffsetNode(parent, index, node, 0, "TransparencyLUTs", 1, ModTransparceySizeReduction);
+		loadOffsetNode(parent, index, node, 0, "TransparencyLUTs", 1, ModTransparencySizeReduction);
 	}
 }
 
@@ -2317,8 +2331,8 @@ void Mod::loadResourceConfigFile(const FileMap::FileRecord &filerec)
 
 	if (const YAML::Node& luts = doc["transparencyLUTs"])
 	{
-		const size_t start = _modCurrent->offset / ModTransparceySizeReduction;
-		const size_t limit =  _modCurrent->size / ModTransparceySizeReduction;
+		const size_t start = _modCurrent->offset / ModTransparencySizeReduction;
+		const size_t limit =  _modCurrent->size / ModTransparencySizeReduction;
 		size_t curr = 0;
 
 		_transparencies.resize(start + limit);
@@ -6009,7 +6023,7 @@ void getSoldierScript(const Mod* mod, const RuleSoldier* &soldier, const std::st
 		soldier = nullptr;
 	}
 }
-void getInvenotryScript(const Mod* mod, const RuleInventory* &inv, const std::string &name)
+void getInventoryScript(const Mod* mod, const RuleInventory* &inv, const std::string &name)
 {
 	if (mod)
 	{
@@ -6056,7 +6070,7 @@ void Mod::ScriptRegister(ScriptParserBase *parser)
 	mod.add<&getSkillScript>("getRuleSkill");
 	mod.add<&getRuleResearch>("getRuleResearch");
 	mod.add<&getSoldierScript>("getRuleSoldier");
-	mod.add<&getInvenotryScript>("getRuleInventory");
+	mod.add<&getInventoryScript>("getRuleInventory");
 	mod.add<&Mod::getInventoryRightHand>("getRuleInventoryRightHand");
 	mod.add<&Mod::getInventoryLeftHand>("getRuleInventoryLeftHand");
 	mod.add<&Mod::getInventoryBackpack>("getRuleInventoryBackpack");

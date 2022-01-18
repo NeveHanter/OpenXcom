@@ -1486,7 +1486,7 @@ void Globe::drawDetail()
 		delete label;
 	}
 
-	static int debugType = 0;
+	int& debugType = _game->getSavedGame()->debugType;
 	static bool canSwitchDebugType = false;
 	if (_game->getSavedGame()->getDebugMode())
 	{
@@ -1497,6 +1497,9 @@ void Globe::drawDetail()
 			color = 0;
 			for (std::vector<Country*>::iterator i = _game->getSavedGame()->getCountries()->begin(); i != _game->getSavedGame()->getCountries()->end(); ++i)
 			{
+				if (_game->getSavedGame()->debugCountry && _game->getSavedGame()->debugCountry != (*i))
+					continue;
+
 				color += 10;
 				for (size_t k = 0; k != (*i)->getRules()->getLatMax().size(); ++k)
 				{
@@ -1551,8 +1554,13 @@ void Globe::drawDetail()
 						continue;
 
 					color += 2;
+					int areaNumber = 0;
 					for (std::vector<MissionArea>::const_iterator k = (*j).areas.begin(); k != (*j).areas.end(); ++k)
 					{
+						++areaNumber;
+						if (_game->getSavedGame()->debugArea > 0 && _game->getSavedGame()->debugArea != areaNumber)
+							continue;
+
 						double lon2 = (*k).lonMax;
 						double lon1 = (*k).lonMin;
 						double lat2 = (*k).latMax;
