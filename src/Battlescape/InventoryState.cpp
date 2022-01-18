@@ -224,11 +224,13 @@ InventoryState::InventoryState(bool tu, BattlescapeState *parent, Base *base, bo
 	_btnUnload->onMouseIn((ActionHandler)&InventoryState::txtTooltipIn);
 	_btnUnload->onMouseOut((ActionHandler)&InventoryState::txtTooltipOut);
 
-	_btnGround->onMouseClick((ActionHandler)&InventoryState::btnGroundClick, SDL_BUTTON_LEFT);
-	_btnGround->onMouseClick((ActionHandler)&InventoryState::btnGroundClick, SDL_BUTTON_RIGHT);
+	_btnGround->onMouseClick((ActionHandler)&InventoryState::btnGroundClickForward, SDL_BUTTON_LEFT);
+	_btnGround->onMouseClick((ActionHandler)&InventoryState::btnGroundClickBackward, SDL_BUTTON_RIGHT);
 	_btnGround->setTooltip("STR_SCROLL_RIGHT");
 	_btnGround->onMouseIn((ActionHandler)&InventoryState::txtTooltipIn);
 	_btnGround->onMouseOut((ActionHandler)&InventoryState::txtTooltipOut);
+	_btnGround->onKeyboardPress((ActionHandler)&InventoryState::btnGroundClickBackward, Options::keyBattleLeft);
+	_btnGround->onKeyboardPress((ActionHandler)&InventoryState::btnGroundClickForward, Options::keyBattleRight);
 
 	_btnRank->onMouseClick((ActionHandler)&InventoryState::btnRankClick);
 	_btnRank->setTooltip("STR_UNIT_STATS");
@@ -413,7 +415,7 @@ void InventoryState::init()
 		if (_reloadUnit)
 		{
 			// Step 0: update unit's armor
-			unit->updateArmorFromSoldier(_game->getMod(), s, s->getArmor(), _battleGame->getDepth());
+			unit->updateArmorFromSoldier(_game->getMod(), s, s->getArmor(), _battleGame->getDepth(), false);
 
 			// Step 1: remember the unit's equipment (incl. loaded fixed items)
 			_clearInventoryTemplate(_tempInventoryTemplate);
@@ -1103,14 +1105,9 @@ void InventoryState::btnQuickSearchApply(Action *)
  * Shows more ground items / rearranges them.
  * @param action Pointer to an action.
  */
-void InventoryState::btnGroundClick(Action *action)
+void InventoryState::btnGroundClickForward(Action *action)
 {
-	if (_game->isRightClick(action))
-	{
-		// scroll backwards
-		_inv->arrangeGround(-1);
-	}
-	else if (_game->isShiftPressed())
+	if (_game->isShiftPressed())
 	{
 		// scroll backwards
 		_inv->arrangeGround(-1);
@@ -1120,6 +1117,16 @@ void InventoryState::btnGroundClick(Action *action)
 		// scroll forward
 		_inv->arrangeGround(1);
 	}
+}
+
+/**
+ * Shows more ground items / rearranges them.
+ * @param action Pointer to an action.
+ */
+void InventoryState::btnGroundClickBackward(Action *action)
+{
+	// scroll backwards
+	_inv->arrangeGround(-1);
 }
 
 /**

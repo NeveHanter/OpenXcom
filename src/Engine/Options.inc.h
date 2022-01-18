@@ -62,6 +62,7 @@ OPT SDL_Keycode keyGeoDailyPilotExperience, keyGeoUfoTracker, keyGeoTechTreeView
 	keyRemoveSoldiersFromTraining, keyAddSoldiersToTraining,
 	keyInventoryArmor, keyInventoryAvatar, keyInventorySave, keyInventoryLoad,
 	keyInvSavePersonalEquipment, keyInvLoadPersonalEquipment, keyInvShowPersonalEquipment,
+	keyBattleShowLayers,
 	keyBattleUseSpecial,
 	keyBattleActionItem1, keyBattleActionItem2, keyBattleActionItem3, keyBattleActionItem4, keyBattleActionItem5,
 	keyNightVisionToggle, keyNightVisionHold, keySelectMusicTrack;

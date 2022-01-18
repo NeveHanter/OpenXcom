@@ -146,9 +146,9 @@ void Unit::afterLoad(const Mod* mod)
 		if (_capturable && _armor->getCorpseBattlescape().front()->isRecoverable() && _spawnUnit == nullptr)
 		{
 			mod->checkForSoftError(
-				_liveAlien == nullptr && Mod::isEmptyRuleName(_civilianRecoveryType),
+				_liveAlien == nullptr,
 				_type,
-				"This unit can be recovered (in theory), but there is no corresponding item to recover (nor any civilianRecoveryType).",
+				"This unit can be recovered (in theory), but there is no corresponding item to recover.",
 				LOG_INFO
 			);
 		}
@@ -168,9 +168,6 @@ void Unit::afterLoad(const Mod* mod)
 				"This unit has a corresponding item to recover, but still isn't recoverable. Reason: (" + s + "). Consider marking the unit with 'liveAlien: \"\"'.",
 				LOG_INFO
 			);
-
-			// FIXME: this is too restrictive; I will need to review all the cases and probably refactor civilianRecoveryType functionality a bit too
-			//mod->checkForSoftError(!Mod::isEmptyRuleName(_civilianRecoveryType), _type, "There is civilianRecoveryType but unit is not recoverable (" + s + ")");
 		}
 	}
 }

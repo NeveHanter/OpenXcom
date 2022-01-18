@@ -2354,7 +2354,8 @@ bool TileEngine::hitUnit(BattleActionAttack attack, BattleUnit *target, const Po
 
 	const int healthOrig = target->getHealth();
 	const int stunLevelOrig = target->getStunlevel();
-	const int adjustedDamage = target->damage(relative, damage, type, _save, attack);
+
+	target->damage(relative, damage, type, _save, attack);
 
 	const int healthDamage = healthOrig - target->getHealth();
 	const int stunDamage = target->getStunlevel() - stunLevelOrig;
@@ -2384,53 +2385,6 @@ bool TileEngine::hitUnit(BattleActionAttack attack, BattleUnit *target, const Po
 	if (attack.attacker && attack.attacker->getOriginalFaction() == FACTION_PLAYER)
 	{
 		awardExperience(attack, target, rangeAtack);
-	}
-
-	if (type->IgnoreNormalMoraleLose == false)
-	{
-		const int bravery = target->reduceByBravery(10);
-		const int modifier = target->getFaction() == FACTION_PLAYER ? _save->getFactionMoraleModifier(true) : 100;
-		const int morale_loss = 100 * (adjustedDamage * bravery / 10) / modifier;
-
-		target->moraleChange(-morale_loss);
-	}
-
-	if ((target->getSpecialAbility() == SPECAB_EXPLODEONDEATH || target->getSpecialAbility() == SPECAB_BURN_AND_EXPLODE) && !target->isOut() && target->isOutThresholdExceed())
-	{
-		if (type->IgnoreSelfDestruct == false && !target->hasAlreadyExploded())
-		{
-			target->setAlreadyExploded(true);
-			Position p = Position(target->getPosition().x * 16, target->getPosition().y * 16, target->getPosition().z * 24);
-			_save->getBattleGame()->statePushNext(new ExplosionBState(_save->getBattleGame(), p, BattleActionAttack{ BA_NONE, target, }, 0));
-		}
-	}
-
-	if (adjustedDamage >= type->FireThreshold)
-	{
-		float resistance = target->getArmor()->getDamageModifier(type->ResistType);
-		if (resistance > 0.0)
-		{
-			int burnTime = RNG::generate(0, int(5.0f * resistance));
-			if (target->getFire() < burnTime)
-			{
-				target->setFire(burnTime); // catch fire and burn
-			}
-		}
-	}
-
-	// fire extinguisher
-	if (target && target->getFire())
-	{
-		if (attack.weapon_item && attack.weapon_item->getRules()->isFireExtinguisher())
-		{
-			// firearm, melee weapon, or even a grenade...
-			target->setFire(0);
-		}
-		else if (attack.damage_item && attack.damage_item->getRules()->isFireExtinguisher())
-		{
-			// bullet/ammo
-			target->setFire(0);
-		}
 	}
 
 	// Use case: an xcom soldier throwing a smoke grenade on a dying unit should not override the previously remembered murderer
@@ -4734,11 +4688,19 @@ bool TileEngine::validTerrainMeleeRange(BattleAction* action)
 	}
 	if (originTile && neighbouringTile)
 	{
-		auto setTarget = [](Tile* tt, TilePart tp, BattleAction* aa) -> bool
+		auto setTarget = [](Tile* tt, TilePart tp, BattleAction* aa, int dir = -1) -> bool
 		{
 			MapData* obj = tt->getMapData(tp);
 			if (obj)
 			{
+				if (dir > -1 && tp == O_OBJECT)
+				{
+					auto bigWall = obj->getBigWall();
+					if (dir == 0 /*north*/ && bigWall != Pathfinding::BIGWALLNORTH && bigWall != Pathfinding::BIGWALLWESTANDNORTH) return false;
+					if (dir == 2 /*east */ && bigWall != Pathfinding::BIGWALLEAST  && bigWall != Pathfinding::BIGWALLEASTANDSOUTH) return false;
+					if (dir == 4 /*south*/ && bigWall != Pathfinding::BIGWALLSOUTH && bigWall != Pathfinding::BIGWALLEASTANDSOUTH) return false;
+					if (dir == 6 /*west */ && bigWall != Pathfinding::BIGWALLWEST  && bigWall != Pathfinding::BIGWALLWESTANDNORTH) return false;
+				}
 				if (tp != O_OBJECT && !obj->isDoor() && !obj->isUFODoor() && tt->getTUCost(tp, MT_WALK) < 255)
 				{
 					// it is possible to walk through this (rubble) wall... no need to attack it
@@ -4762,6 +4724,20 @@ bool TileEngine::validTerrainMeleeRange(BattleAction* action)
 			}
 			return false;
 		};
+
+		if (setTarget(originTile, O_OBJECT, action, direction))
+		{
+			// All directions: target the object (marked as big wall) on the current tile
+			return true;
+		}
+		if (size > 1)
+		{
+			if (setTarget(originTile2, O_OBJECT, action, direction))
+			{
+				// All directions
+				return true;
+			}
+		}
 
 		if (direction == 0 && setTarget(originTile, O_NORTHWALL, action))
 		{
