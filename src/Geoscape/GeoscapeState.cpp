@@ -125,6 +125,7 @@
 #include "../Mod/RuleGlobe.h"
 #include "../Engine/Exception.h"
 #include "../Mod/AlienDeployment.h"
+#include "../Mod/AlienRace.h"
 #include "../Mod/RuleInterface.h"
 #include "../Mod/RuleVideo.h"
 #include "../fmath.h"
@@ -461,9 +462,9 @@ GeoscapeState::GeoscapeState() : _pause(false), _zoomInEffectDone(false), _zoomO
 		countryList.push_back("All countries");
 		for (auto c : *_game->getSavedGame()->getCountries())
 		{
-			countryList.push_back(c->getRules()->getType());
+			countryList.push_back(tr(c->getRules()->getType()));
 		}
-		_cbxCountry->setOptions(countryList, true);
+		_cbxCountry->setOptions(countryList, false);
 		_cbxCountry->setVisible(false);
 		_cbxCountry->onChange((ActionHandler)&GeoscapeState::cbxCountryChange);
 	}
@@ -1702,7 +1703,14 @@ void GeoscapeState::baseHunting()
 								AlienMission *mission = new AlienMission(rule);
 								mission->setRegion(_game->getSavedGame()->locateRegion(*(*ab))->getRules()->getType(), *_game->getMod());
 								mission->setId(_game->getSavedGame()->getId("ALIEN_MISSIONS"));
-								mission->setRace((*ab)->getAlienRace());
+								if (!(*ab)->getDeployment()->isHuntMissionRaceFromAlienBase() && rule.hasRaceWeights())
+								{
+									mission->setRace(rule.generateRace(_game->getSavedGame()->getMonthsPassed()));
+								}
+								else
+								{
+									mission->setRace((*ab)->getAlienRace());
+								}
 								mission->setAlienBase((*ab));
 								int targetZone = -1;
 								if (mission->getRules().getObjective() == OBJECTIVE_SITE)
@@ -2262,7 +2270,14 @@ void GenerateSupplyMission::operator()(AlienBase *base) const
 			}
 			mission->setRegion(targetRegion, _mod);
 			mission->setId(_save.getId("ALIEN_MISSIONS"));
-			mission->setRace(base->getAlienRace());
+			if (!base->getDeployment()->isGenMissionRaceFromAlienBase() && rule.hasRaceWeights())
+			{
+				mission->setRace(rule.generateRace(_save.getMonthsPassed()));
+			}
+			else
+			{
+				mission->setRace(base->getAlienRace());
+			}
 			mission->setAlienBase(base);
 			int targetZone = -1;
 			if (mission->getRules().getObjective() == OBJECTIVE_SITE)
@@ -3904,6 +3919,11 @@ void GeoscapeState::determineAlienMissions()
 					alienBase->setStartMonth(month);
 				}
 				alienBase->setDeployment(upgrade);
+				auto* upgradeRace = mod->getAlienRace(upgrade->getUpgradeRace(), false);
+				if (upgradeRace)
+				{
+					alienBase->setAlienRace(upgradeRace->getId());
+				}
 			}
 		}
 	}
