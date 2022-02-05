@@ -594,6 +594,63 @@ BattleUnit::BattleUnit(const Mod *mod, Unit *unit, UnitFaction faction, int id, 
 	prepareUnitResponseSounds(mod);
 }
 
+/**
+ * Updates BattleUnit's armor and related attributes (after a change/transformation of armor).
+ */
+void BattleUnit::updateArmorFromNonSoldier(const Mod* mod, Armor* newArmor, int depth)
+{
+	if (_originalFaction != FACTION_PLAYER)
+	{
+		// armor updates for enemies and civilians is only allowed in the constructor (they don't travel between mission stages)
+		return;
+	}
+	if (newArmor)
+	{
+		_armor = newArmor;
+	}
+	_standHeight = _armor->getStandHeight() == -1 ? _unitRules->getStandHeight() : _armor->getStandHeight();
+	_kneelHeight = _armor->getKneelHeight() == -1 ? _unitRules->getKneelHeight() : _armor->getKneelHeight();
+	_floatHeight = _armor->getFloatHeight() == -1 ? _unitRules->getFloatHeight() : _armor->getFloatHeight();
+	_loftempsSet = _armor->getLoftempsSet();
+
+	_movementType = _armor->getMovementType();
+	if (_movementType == MT_FLOAT) {
+		if (depth > 0) { _movementType = MT_FLY; } else { _movementType = MT_WALK; }
+	} else if (_movementType == MT_SINK) {
+		if (depth == 0) { _movementType = MT_FLY; } else { _movementType = MT_WALK; }
+	}
+
+	_stats = *_unitRules->getStats();
+	_stats += *_armor->getStats();	// armors may modify effective stats
+	_stats = UnitStats::obeyFixedMinimum(_stats); // don't allow to go into minus!
+
+	_maxViewDistanceAtDark = _armor->getVisibilityAtDark() ? _armor->getVisibilityAtDark() : 9;
+	_maxViewDistanceAtDarkSquared = _maxViewDistanceAtDark * _maxViewDistanceAtDark;
+	_maxViewDistanceAtDay = _armor->getVisibilityAtDay() ? _armor->getVisibilityAtDay() : mod->getMaxViewDistance();
+
+	_maxArmor[SIDE_FRONT] = _armor->getFrontArmor();
+	_maxArmor[SIDE_LEFT] = _armor->getLeftSideArmor();
+	_maxArmor[SIDE_RIGHT] = _armor->getRightSideArmor();
+	_maxArmor[SIDE_REAR] = _armor->getRearArmor();
+	_maxArmor[SIDE_UNDER] = _armor->getUnderArmor();
+
+	_tu = _stats.tu;
+	_energy = _stats.stamina;
+	_health = std::min(_health, (int)_stats.health);
+	_mana = std::min(_mana, (int)_stats.mana);
+
+	_currentArmor[SIDE_FRONT] = _maxArmor[SIDE_FRONT];
+	_currentArmor[SIDE_LEFT] = _maxArmor[SIDE_LEFT];
+	_currentArmor[SIDE_RIGHT] = _maxArmor[SIDE_RIGHT];
+	_currentArmor[SIDE_REAR] = _maxArmor[SIDE_REAR];
+	_currentArmor[SIDE_UNDER] = _maxArmor[SIDE_UNDER];
+
+	setRecolor(RNG::seedless(0, 127), RNG::seedless(0, 127), 0);
+
+	prepareUnitSounds();
+	prepareUnitResponseSounds(mod);
+}
+
 
 /**
  *
@@ -1503,6 +1560,10 @@ static inline void setValueMax(int& value, int diff, int min, int max)
  */
 int BattleUnit::damage(Position relative, int damage, const RuleDamageType *type, SavedBattleGame *save, BattleActionAttack attack, UnitSide sideOverride, UnitBodyPart bodypartOverride)
 {
+	if (save->isPreview())
+	{
+		return 0;
+	}
 	UnitSide side = SIDE_FRONT;
 	UnitBodyPart bodypart = BODYPART_TORSO;
 
@@ -1719,6 +1780,7 @@ int BattleUnit::damage(Position relative, int damage, const RuleDamageType *type
 	}
 
 	// special effects
+	if (save->getBattleState())
 	{
 		constexpr int arg_specialDamageTransform = 0;
 		constexpr int arg_specialDamageTransformChance = 1;
@@ -2149,6 +2211,15 @@ void BattleUnit::spendCost(const RuleItemUseCost& cost)
 void BattleUnit::clearTimeUnits()
 {
 	_tu = 0;
+}
+
+/**
+ * Reset time units and energy.
+ */
+void BattleUnit::resetTimeUnitsAndEnergy()
+{
+	_tu = _stats.tu;
+	_energy = _stats.stamina;
 }
 
 /**
@@ -5188,6 +5259,22 @@ bool BattleUnit::isSummonedPlayerUnit() const
 }
 
 /**
+ * Should this unit (player, alien or civilian) be ignored for various things related to soldier diaries and commendations?
+ */
+bool BattleUnit::isCosmetic() const
+{
+	return _unitRules && _unitRules->isCosmetic();
+}
+
+/**
+ * Should this AI unit (alien or civilian) be ignored by other AI units?
+ */
+bool BattleUnit::isIgnoredByAI() const
+{
+	return _unitRules && _unitRules->isIgnoredByAI();
+}
+
+/**
  * Disable showing indicators for this unit.
  */
 void BattleUnit::disableIndicators()
@@ -6119,7 +6206,7 @@ void commonImpl(BindBase& b, Mod* mod)
 
 void battleActionImpl(BindBase& b)
 {
-	b.addCustomConst("battle_action_aimshoot", BA_AIMEDSHOT);
+	b.addCustomConst("battle_action_aimshoot", BA_AIMEDSHOT); //TODO: fix name, it require some new logic in script to allow old typo for backward compatiblity
 	b.addCustomConst("battle_action_autoshoot", BA_AUTOSHOT);
 	b.addCustomConst("battle_action_snapshot", BA_SNAPSHOT);
 	b.addCustomConst("battle_action_walk", BA_WALK);

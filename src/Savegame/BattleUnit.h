@@ -208,6 +208,8 @@ public:
 	BattleUnit(const Mod *mod, Unit *unit, UnitFaction faction, int id, const RuleEnviroEffects* enviro, Armor *armor, StatAdjustment *adjustment, int depth);
 	/// Updates BattleUnit's armor and related attributes (after a change/transformation of armor).
 	void updateArmorFromSoldier(const Mod *mod, Soldier *soldier, Armor *ruleArmor, int depth, bool inBattlescape);
+	/// Updates BattleUnit's armor and related attributes (after a change/transformation of armor).
+	void updateArmorFromNonSoldier(const Mod* mod, Armor* newArmor, int depth);
 	/// Cleans up the BattleUnit.
 	~BattleUnit();
 	/// Loads the unit from YAML.
@@ -340,6 +342,8 @@ public:
 	void spendCost(const RuleItemUseCost& cost);
 	/// Clear time units.
 	void clearTimeUnits();
+	/// Reset time units and energy.
+	void resetTimeUnitsAndEnergy();
 	/// Add unit to visible units.
 	bool addToVisibleUnits(BattleUnit *unit);
 	/// Remove a unit from the list of visible units.
@@ -755,6 +759,10 @@ public:
 	void setSummonedPlayerUnit(bool summonedPlayerUnit);
 	/// Was this unit summoned by an item?
 	bool isSummonedPlayerUnit() const;
+	/// Should this unit (player, alien or civilian) be ignored for various things related to soldier diaries and commendations?
+	bool isCosmetic() const;
+	/// Should this AI unit (alien or civilian) be ignored by other AI units?
+	bool isIgnoredByAI() const;
 	/// Marks this unit as resummoned fake civilian and therefore won't count for civilian scoring in the Debriefing.
 	void markAsResummonedFakeCivilian() { _resummonedFakeCivilian = true; _status = STATUS_IGNORE_ME; }
 	/// Is this unit a resummoned fake civilian?

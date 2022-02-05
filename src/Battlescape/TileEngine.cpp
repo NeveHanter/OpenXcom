@@ -1769,6 +1769,11 @@ void TileEngine::calculateFOV(Position position, int eventRadius, const bool upd
  */
 bool TileEngine::checkReactionFire(BattleUnit *unit, const BattleAction &originalAction)
 {
+	if (_save->isPreview())
+	{
+		return false;
+	}
+
 	// reaction fire only triggered when the actioning unit is of the currently playing side, and is still on the map (alive)
 	if (unit->getFaction() != _save->getSide() || unit->getTile() == 0)
 	{
@@ -1836,8 +1841,8 @@ std::vector<TileEngine::ReactionScore> TileEngine::getSpottingUnits(BattleUnit* 
 				(*i)->getReactionScore() >= threshold &&
 				// not a friend
 				(*i)->getFaction() != _save->getSide() &&
-				// not a civilian, or a civilian shooting at bad guys
-				((*i)->getFaction() != FACTION_NEUTRAL || unit->getFaction() == FACTION_HOSTILE) &&
+				// not a civilian, or a civilian shooting at bad non-ignored guys
+				((*i)->getFaction() != FACTION_NEUTRAL || (unit->getFaction() == FACTION_HOSTILE && !unit->isIgnoredByAI())) &&
 				// closer than 20 tiles
 				Position::distance2dSq(unit->getPosition(), (*i)->getPosition()) <= getMaxViewDistanceSq())
 			{
@@ -2176,6 +2181,11 @@ int TileEngine::hitTile(Tile* tile, int damage, const RuleDamageType* type)
  */
 bool TileEngine::awardExperience(BattleActionAttack attack, BattleUnit *target, bool rangeAtack)
 {
+	if (_save->isPreview())
+	{
+		return false;
+	}
+
 	auto unit = attack.attacker;
 	auto weapon = attack.weapon_item;
 
@@ -2347,6 +2357,10 @@ bool TileEngine::awardExperience(BattleActionAttack attack, BattleUnit *target, 
  */
 bool TileEngine::hitUnit(BattleActionAttack attack, BattleUnit *target, const Position &relative, int damage, const RuleDamageType *type, bool rangeAtack)
 {
+	if (_save->isPreview())
+	{
+		return false;
+	}
 	if (!target || target->getHealth() <= 0)
 	{
 		return false;
@@ -2865,6 +2879,11 @@ bool TileEngine::detonate(Tile* tile, int explosive)
  */
 Tile *TileEngine::checkForTerrainExplosions()
 {
+	if (_save->isPreview())
+	{
+		return 0;
+	}
+
 	for (int i = 0; i < _save->getMapSizeXYZ(); ++i)
 	{
 		if (_save->getTile(i)->getExplosive())
@@ -3919,6 +3938,11 @@ int TileEngine::psiAttackCalculate(BattleActionAttack::ReadOnly attack, const Ba
  */
 bool TileEngine::psiAttack(BattleActionAttack attack, BattleUnit *victim)
 {
+	if (_save->isPreview())
+	{
+		return false;
+	}
+
 	if (!victim)
 		return false;
 
@@ -3981,7 +4005,10 @@ bool TileEngine::psiAttack(BattleActionAttack attack, BattleUnit *victim)
 			if (!attack.attacker->getStatistics()->duplicateEntry(STATUS_PANICKING, victim->getId()))
 			{
 				killStat.status = STATUS_PANICKING;
-				attack.attacker->getStatistics()->kills.push_back(new BattleUnitKills(killStat));
+				if (!victim->isCosmetic())
+				{
+					attack.attacker->getStatistics()->kills.push_back(new BattleUnitKills(killStat));
+				}
 			}
 		}
 		else if (attack.type == BA_MINDCONTROL)
@@ -3990,7 +4017,10 @@ bool TileEngine::psiAttack(BattleActionAttack attack, BattleUnit *victim)
 			if (!attack.attacker->getStatistics()->duplicateEntry(STATUS_TURNING, victim->getId()))
 			{
 				killStat.status = STATUS_TURNING;
-				attack.attacker->getStatistics()->kills.push_back(new BattleUnitKills(killStat));
+				if (!victim->isCosmetic())
+				{
+					attack.attacker->getStatistics()->kills.push_back(new BattleUnitKills(killStat));
+				}
 			}
 			victim->setMindControllerId(attack.attacker->getId());
 			victim->convertToFaction(attack.attacker->getFaction());
@@ -4101,6 +4131,11 @@ void TileEngine::medikitRemoveIfEmpty(BattleAction *action)
 
 bool TileEngine::medikitUse(BattleAction *action, BattleUnit *target, BattleMediKitAction originalMedikitAction, UnitBodyPart bodyPart)
 {
+	if (_save->isPreview())
+	{
+		return false;
+	}
+
 	BattleActionAttack attack;
 	attack.type = action->type;
 	attack.attacker = action->actor;
@@ -4224,6 +4259,11 @@ bool TileEngine::medikitUse(BattleAction *action, BattleUnit *target, BattleMedi
  */
 bool TileEngine::skillUse(BattleAction *action, const RuleSkill *skill)
 {
+	if (_save->isPreview())
+	{
+		return false;
+	}
+
 	bool continueAction = true;
 	bool spendTu = false;
 	std::string message;
