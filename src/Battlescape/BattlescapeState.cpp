@@ -70,6 +70,8 @@
 #include "../Mod/AlienDeployment.h"
 #include "../Mod/Armor.h"
 #include "../Mod/RuleUfo.h"
+#include "../Savegame/Base.h"
+#include "../Savegame/Craft.h"
 #include "../Savegame/SavedGame.h"
 #include "../Savegame/SavedBattleGame.h"
 #include "../Savegame/Tile.h"
@@ -526,13 +528,20 @@ BattlescapeState::BattlescapeState() :
 	_btnShowLayers->onKeyboardPress((ActionHandler)&BattlescapeState::btnUfopaediaClick, Options::keyGeoUfopedia);
 
 	_btnHelp->onMouseClick((ActionHandler)&BattlescapeState::btnHelpClick);
-	_btnHelp->onKeyboardPress((ActionHandler)&BattlescapeState::btnHelpClick, Options::keyBattleOptions);
+	if (!_save->isPreview())
+	{
+		_btnHelp->onKeyboardPress((ActionHandler)&BattlescapeState::btnHelpClick, Options::keyBattleOptions);
+	}
 	_btnHelp->setTooltip("STR_OPTIONS");
 	_btnHelp->onMouseIn((ActionHandler)&BattlescapeState::txtTooltipIn);
 	_btnHelp->onMouseOut((ActionHandler)&BattlescapeState::txtTooltipOut);
 
 	_btnEndTurn->onMouseClick((ActionHandler)&BattlescapeState::btnEndTurnClick);
 	_btnEndTurn->onKeyboardPress((ActionHandler)&BattlescapeState::btnEndTurnClick, Options::keyBattleEndTurn);
+	if (_save->isPreview())
+	{
+		_btnEndTurn->onKeyboardPress((ActionHandler)&BattlescapeState::btnEndTurnClick, Options::keyBattleOptions); // Esc
+	}
 	_btnEndTurn->setTooltip("STR_END_TURN");
 	_btnEndTurn->onMouseIn((ActionHandler)&BattlescapeState::txtTooltipInEndTurn);
 	_btnEndTurn->onMouseOut((ActionHandler)&BattlescapeState::txtTooltipOut);
@@ -870,7 +879,7 @@ void BattlescapeState::init()
 	_txtTooltip->setText("");
 	_btnReserveKneel->toggle(_save->getKneelReserved());
 	_battleGame->setKneelReserved(_save->getKneelReserved());
-	if (_autosave > 0)
+	if (_autosave > 0 && !_save->isPreview())
 	{
 		int currentTurn = _autosave;
 		_autosave = 0;
@@ -1413,6 +1422,10 @@ void BattlescapeState::btnKneelClick(Action *)
  */
 void BattlescapeState::btnInventoryClick(Action *)
 {
+	if (_save->isPreview())
+	{
+		return;
+	}
 #if 0
 	if (_save->getDebugMode())
 	{
@@ -1565,6 +1578,14 @@ void BattlescapeState::btnUfopaediaClick(Action *)
  */
 void BattlescapeState::btnHelpClick(Action *)
 {
+	if (_save->isPreview())
+	{
+		// Notes for future explorers:
+		// 1. saving makes no sense
+		// 2. loading could be enabled, but needs changes in the Game's _states management; make sure you know what you're doing!
+		return;
+	}
+
 	if (allowButtons(true))
 		_game->pushState(new PauseState(OPT_BATTLESCAPE));
 }
@@ -1592,6 +1613,25 @@ void BattlescapeState::btnEndTurnClick(Action *)
  */
 void BattlescapeState::btnAbortClick(Action *)
 {
+	if (_save->isPreview())
+	{
+		if (!_save->getCraftForPreview())
+		{
+			// base preview
+			return;
+		}
+		// Notes for future explorers:
+		// - there are craft, which can have multiple layouts (one is chosen randomly at the start of a battle)
+		// - these layouts are not forced to be compatible
+		// - thus custom craft deployment for one layout may not be compatible with another layout either
+		// - so instead of having multiple custom deployments per craft, I decided to not support it for such craft at all
+		// - if you want to add partial or full support for it... make sure you don't forget all the corner cases
+		if (_save->getCraftForPreview()->getRules()->getBattlescapeTerrainData()->getMapBlocks()->size() > 1)
+		{
+			return;
+		}
+	}
+
 	if (allowButtons())
 		_game->pushState(new AbortMissionState(_save, this));
 }
@@ -2293,17 +2333,14 @@ void BattlescapeState::updateSoldierInfo(bool checkFOV)
 			customBg->blitNShade(_rank, 0, 0);
 
 			// show avatar
-			auto defaultPrefix = soldier->getArmor()->getLayersDefaultPrefix();
-			Armor *customArmor = nullptr;
+			Armor *customArmor = soldier->getArmor();
 			if (!soldier->getRules()->getArmorForAvatar().empty())
 			{
 				customArmor = _game->getMod()->getArmor(soldier->getRules()->getArmorForAvatar());
-				defaultPrefix = customArmor->getLayersDefaultPrefix();
 			}
-			if (!defaultPrefix.empty())
+			if (customArmor->hasLayersDefinition())
 			{
-				auto layers = soldier->getArmorLayers(customArmor);
-				for (auto layer : layers)
+				for (auto layer : soldier->getArmorLayers(customArmor))
 				{
 					auto surf = _game->getMod()->getSurface(layer, true);
 
@@ -2994,6 +3031,30 @@ inline void BattlescapeState::handle(Action *action)
 						_game->pushState(new InfoboxState(ss.str()));
 					}
 				}
+				// "ctrl-w" - warp unit
+				else if ((_save->getDebugMode() || _save->isPreview()) && key == SDLK_w && ctrlPressed)
+				{
+					BattleUnit *unit = _save->getSelectedUnit();
+					if (unit)
+					{
+						Position newPos;
+						_map->getSelectorPosition(&newPos);
+						if (_save->getBattleGame()->getTileEngine()->isPositionValidForUnit(newPos, unit))
+						{
+							debug("Beam me up Scotty");
+							_save->getPathfinding()->removePreview();
+
+							unit->setTile(_save->getTile(newPos), _save);
+							unit->setPosition(newPos);
+
+							//free refresh as bonus
+							unit->updateUnitStats(true, false);
+							_save->getTileEngine()->calculateLighting(LL_UNITS);
+							_save->getBattleGame()->handleState();
+							updateSoldierInfo(true);
+						}
+					}
+				}
 				if (Options::debug)
 				{
 					// "ctrl-d" - enable debug mode
@@ -3059,30 +3120,6 @@ inline void BattlescapeState::handle(Action *action)
 						_save->getBattleGame()->checkForCasualties(nullptr, BattleActionAttack{}, true, false);
 						_save->getBattleGame()->handleState();
 					}
-					// "ctrl-w" - warp unit
-					else if (_save->getDebugMode() && key == SDLK_w && ctrlPressed)
-					{
-						BattleUnit *unit = _save->getSelectedUnit();
-						if (unit)
-						{
-							Position newPos;
-							_map->getSelectorPosition(&newPos);
-							if (_save->getBattleGame()->getTileEngine()->isPositionValidForUnit(newPos, unit))
-							{
-								debug("Beam me up Scotty");
-								_save->getPathfinding()->removePreview();
-
-								unit->setTile(_save->getTile(newPos), _save);
-								unit->setPosition(newPos);
-
-								//free refresh as bonus
-								unit->updateUnitStats(true, false);
-								_save->getTileEngine()->calculateLighting(LL_UNITS);
-								_save->getBattleGame()->handleState();
-								updateSoldierInfo(true);
-							}
-						}
-					}
 					// f11 - voxel map dump
 					else if (key == SDLK_F11)
 					{
@@ -3095,7 +3132,7 @@ inline void BattlescapeState::handle(Action *action)
 					}
 				}
 				// quick save and quick load
-				if (!_game->getSavedGame()->isIronman())
+				if (!_game->getSavedGame()->isIronman() && !_save->isPreview())
 				{
 					if (key == Options::keyQuickSave)
 					{
@@ -3456,6 +3493,8 @@ void BattlescapeState::popup(State *state)
  */
 void BattlescapeState::finishBattle(bool abort, int inExitArea)
 {
+	bool isPreview = _save->isPreview();
+
 	while (!_game->isState(this))
 	{
 		_game->popState();
@@ -3522,7 +3561,7 @@ void BattlescapeState::finishBattle(bool abort, int inExitArea)
 		nextStage = ruleDeploy->getNextStage();
 	}
 
-	if (!nextStage.empty() && inExitArea)
+	if (!nextStage.empty() && inExitArea && !isPreview)
 	{
 		// if there is a next mission stage + we have people in exit area OR we killed all aliens, load the next stage
 		_popups.clear();
@@ -3538,6 +3577,33 @@ void BattlescapeState::finishBattle(bool abort, int inExitArea)
 		_animTimer->stop();
 		_gameTimer->stop();
 		_game->popState();
+		if (isPreview)
+		{
+			// skip Debriefing
+			Options::baseXResolution = Options::baseXGeoscape;
+			Options::baseYResolution = Options::baseYGeoscape;
+			_game->getScreen()->resetDisplay(false);
+
+			// Restore the cursor in case something weird happened
+			_game->getCursor()->setVisible(true);
+
+			// delete SavedBattleGame
+			_game->getSavedGame()->setBattleGame(0);
+
+			// unmark all craft and all bases (current craft would be enough, but better safe than sorry)
+			for (auto* base : *_game->getSavedGame()->getBases())
+			{
+				base->setInBattlescape(false);
+				for (auto* craft : *base->getCrafts())
+				{
+					craft->setInBattlescape(false);
+				}
+			}
+
+			// reset the music
+			_game->getMod()->playMusic("GMGEO");
+			return;
+		}
 		_game->pushState(new DebriefingState);
 		std::string cutscene;
 		if (ruleDeploy)

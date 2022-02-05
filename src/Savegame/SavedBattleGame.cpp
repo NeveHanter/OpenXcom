@@ -20,6 +20,8 @@
 #include <vector>
 #include "BattleItem.h"
 #include "ItemContainer.h"
+#include "Base.h"
+#include "Craft.h"
 #include "SavedBattleGame.h"
 #include "SavedGame.h"
 #include "Tile.h"
@@ -57,7 +59,8 @@ namespace OpenXcom
 /**
  * Initializes a brand new battlescape saved game.
  */
-SavedBattleGame::SavedBattleGame(Mod *rule, Language *lang) :
+SavedBattleGame::SavedBattleGame(Mod *rule, Language *lang, bool isPreview) :
+	_isPreview(isPreview), _craftPos(), _craftZ(0), _craftForPreview(nullptr),
 	_battleState(0), _rule(rule), _mapsize_x(0), _mapsize_y(0), _mapsize_z(0), _selectedUnit(0),
 	_lastSelectedUnit(0), _pathfinding(0), _tileEngine(0),
 	_reinforcementsItemLevel(0), _enviroEffects(nullptr), _ecEnabledFriendly(false), _ecEnabledHostile(false), _ecEnabledNeutral(false),
@@ -860,6 +863,39 @@ int SavedBattleGame::getMapSizeXYZ() const
 }
 
 /**
+ * Pre-calculate all valid tiles for later use in map drawing.
+ */
+void SavedBattleGame::calculateCraftTiles()
+{
+	if (_craftForPreview && !_craftForPreview->getRules()->getDeployment().empty() && !_craftForPreview->getRules()->useAllStartTiles())
+	{
+		for (auto& vec : _craftForPreview->getRules()->getDeployment())
+		{
+			if (vec.size() >= 3)
+			{
+				Position tmp = Position(vec[0] + _craftPos.x * 10, vec[1] + _craftPos.y * 10, vec[2] + _craftZ);
+				_craftTiles.push_back(tmp);
+			}
+		}
+	}
+	else
+	{
+		for (int i = 0; i < getMapSizeXYZ(); ++i)
+		{
+			auto* tile = getTile(i);
+			if (tile &&
+				tile->getFloorSpecialTileType() == START_POINT &&
+				!tile->getMapData(O_OBJECT) &&
+				tile->getMapData(O_FLOOR) && // for clarity this is checked again, first time was in `getFloorSpecialTileType`
+				tile->getMapData(O_FLOOR)->getTUCost(MT_WALK) < 255)
+			{
+				_craftTiles.push_back(tile->getPosition());
+			}
+		}
+	}
+}
+
+/**
  * Converts a tile index to coordinates.
  * @param index The (unique) tile index.
  * @param x Pointer to the X coordinate.
@@ -1207,6 +1243,11 @@ void SavedBattleGame::startFirstTurn()
  */
 void SavedBattleGame::newTurnUpdateScripts()
 {
+	if (_isPreview)
+	{
+		return;
+	}
+
 	for (std::vector<BattleUnit*>::iterator i = _units.begin(); i != _units.end(); ++i)
 	{
 		if ((*i)->isIgnored())
@@ -1230,6 +1271,203 @@ void SavedBattleGame::newTurnUpdateScripts()
 	reviveUnconsciousUnits(false);
 
 	getBattleGame()->convertInfected();
+}
+
+/**
+ * Tallies the units in the craft deployment preview.
+ */
+BattlescapeTally SavedBattleGame::tallyUnitsForPreview()
+{
+	BattlescapeTally tally = { };
+
+	bool custom = _isPreview && _craftForPreview && !_craftTiles.empty();
+	Position tmp;
+
+	for (auto* unit : _units)
+	{
+		if (unit->getOriginalFaction() == FACTION_PLAYER)
+		{
+			if (unit->isSummonedPlayerUnit())
+			{
+				continue;
+			}
+			if (custom)
+			{
+				bool placementOk = true;
+				for (int x = 0; x < unit->getArmor()->getSize(); ++x)
+				{
+					for (int y = 0; y < unit->getArmor()->getSize(); ++y)
+					{
+						tmp = Position(x + unit->getPosition().x, y + unit->getPosition().y, unit->getPosition().z);
+						bool found = false;
+						for (auto& pos : _craftTiles)
+						{
+							if (pos == tmp)
+							{
+								found = true;
+								break;
+							}
+						}
+						if (!found)
+						{
+							placementOk = false;
+						}
+					}
+				}
+				if (placementOk)
+				{
+					tally.inEntrance++;
+				}
+				else
+				{
+					tally.inField++;
+				}
+			}
+			else
+			{
+				if (unit->isInExitArea(START_POINT))
+				{
+					tally.inEntrance++;
+				}
+				else
+				{
+					tally.inField++;
+				}
+			}
+		}
+	}
+
+	return tally;
+}
+
+/**
+ * Saves the custom craft deployment.
+ */
+void SavedBattleGame::saveCustomCraftDeployment()
+{
+	_craftForPreview->resetCustomDeployment();
+	auto& customSoldierDeployment = _craftForPreview->getCustomSoldierDeployment();
+	auto& customVehicleDeployment = _craftForPreview->getCustomVehicleDeployment();
+
+	Position tmp;
+	for (auto* unit : _units)
+	{
+		if (unit->getOriginalFaction() == FACTION_PLAYER)
+		{
+			if (unit->isSummonedPlayerUnit())
+			{
+				continue;
+			}
+			tmp = Position(unit->getPosition().x - _craftPos.x * 10, unit->getPosition().y - _craftPos.y * 10, unit->getPosition().z - _craftZ);
+			if (unit->getGeoscapeSoldier())
+			{
+				customSoldierDeployment[unit->getGeoscapeSoldier()->getId()] = std::make_pair(tmp, unit->getDirection());
+			}
+			else
+			{
+				VehicleDeploymentData v;
+				v.type = unit->getType();
+				v.pos = tmp;
+				v.dir = unit->getDirection();
+				v.used = false; // irrelevant now, this will be used only in BattlescapeGenerator::addXCOMUnit()
+				customVehicleDeployment.push_back(v);
+			}
+		}
+	}
+}
+
+/**
+ * Saves the custom RuleCraft deployment. Invalidates corresponding custom craft deployments.
+ */
+void SavedBattleGame::saveDummyCraftDeployment()
+{
+	auto* save = getGeoscapeSave();
+
+	// don't forget to invalidate custom deployments of all real craft of this type
+	for (auto* base : *save->getBases())
+	{
+		for (auto* craft : *base->getCrafts())
+		{
+			if (craft->getRules() == _craftForPreview->getRules())
+			{
+				craft->resetCustomDeployment();
+			}
+		}
+	}
+
+	auto& data = save->getCustomRuleCraftDeployments();
+
+	if (isCtrlPressed(true))
+	{
+		// delete
+		data.erase(_craftForPreview->getRules()->getType());
+	}
+	else
+	{
+		// save
+		RuleCraftDeployment customDeployment;
+		Position tmp;
+		for (auto* unit : _units)
+		{
+			if (unit->getOriginalFaction() == FACTION_PLAYER)
+			{
+				if (unit->isSummonedPlayerUnit())
+				{
+					continue;
+				}
+				tmp = Position(unit->getPosition().x - _craftPos.x * 10, unit->getPosition().y - _craftPos.y * 10, unit->getPosition().z - _craftZ);
+				if (unit->getGeoscapeSoldier())
+				{
+					customDeployment.push_back({ tmp.x, tmp.y, tmp.z, unit->getDirection() });
+				}
+			}
+		}
+		data[_craftForPreview->getRules()->getType()] = customDeployment;
+	}
+}
+
+/**
+ * Does the given craft type have a custom deployment?
+ */
+bool SavedBattleGame::hasCustomDeployment(const RuleCraft* rule) const
+{
+	// first check the fallback
+	if (!rule->getDeployment().empty())
+	{
+		return true;
+	}
+	// then the override
+	auto* save = getGeoscapeSave();
+	auto& data = save->getCustomRuleCraftDeployments();
+	if (!data.empty())
+	{
+		auto find = data.find(rule->getType());
+		if (find != data.end())
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * Gets a custom deployment for the given craft type.
+ */
+const RuleCraftDeployment& SavedBattleGame::getCustomDeployment(const RuleCraft* rule) const
+{
+	// first try the override
+	auto* save = getGeoscapeSave();
+	auto& data = save->getCustomRuleCraftDeployments();
+	if (!data.empty())
+	{
+		auto find = data.find(rule->getType());
+		if (find != data.end())
+		{
+			return find->second;
+		}
+	}
+	// this is the fallback
+	return rule->getDeployment();
 }
 
 /**
@@ -1369,12 +1607,17 @@ void SavedBattleGame::nextAnimFrame()
  */
 void SavedBattleGame::setDebugMode()
 {
+	revealMap();
+
+	_debugMode = true;
+}
+
+void SavedBattleGame::revealMap()
+{
 	for (int i = 0; i < _mapsize_z * _mapsize_y * _mapsize_x; ++i)
 	{
 		_tiles[i].setDiscovered(true, O_FLOOR);
 	}
-
-	_debugMode = true;
 }
 
 /**
@@ -1619,6 +1862,11 @@ void SavedBattleGame::addFixedItems(BattleUnit *unit, const std::vector<const Ru
  */
 void SavedBattleGame::initUnit(BattleUnit *unit, size_t itemLevel)
 {
+	if (_isPreview)
+	{
+		return;
+	}
+
 	unit->setSpecialWeapon(this, false);
 	Unit* rule = unit->getUnitRules();
 	const Armor* armor = unit->getArmor();
@@ -1673,15 +1921,12 @@ void SavedBattleGame::initUnit(BattleUnit *unit, size_t itemLevel)
  */
 void SavedBattleGame::initItem(BattleItem *item, BattleUnit *unit)
 {
-	ModScript::scriptCallback<ModScript::CreateItem>(item->getRules(), item, unit, this, this->getTurn());
-}
+	if (_isPreview)
+	{
+		return;
+	}
 
-/**
- * Create new item for unit.
- */
-BattleItem *SavedBattleGame::createItemForUnit(const std::string& type, BattleUnit *unit, bool fixedWeapon)
-{
-	return createItemForUnit(_rule->getItem(type, true), unit, fixedWeapon);
+	ModScript::scriptCallback<ModScript::CreateItem>(item->getRules(), item, unit, this, this->getTurn());
 }
 
 /**
@@ -1689,6 +1934,11 @@ BattleItem *SavedBattleGame::createItemForUnit(const std::string& type, BattleUn
  */
 BattleItem *SavedBattleGame::createItemForUnit(const RuleItem *rule, BattleUnit *unit, bool fixedWeapon)
 {
+	if (_isPreview)
+	{
+		return nullptr;
+	}
+
 	BattleItem *item = new BattleItem(rule, getCurrentItemId());
 	if (!unit->addItem(item, _rule, false, fixedWeapon, fixedWeapon))
 	{
@@ -1708,6 +1958,11 @@ BattleItem *SavedBattleGame::createItemForUnit(const RuleItem *rule, BattleUnit 
  */
 BattleItem *SavedBattleGame::createItemForUnitSpecialBuiltin(const RuleItem *rule, BattleUnit *unit)
 {
+	if (_isPreview)
+	{
+		return nullptr;
+	}
+
 	BattleItem *item = new BattleItem(rule, getCurrentItemId());
 	item->setOwner(unit);
 	item->setSlot(nullptr);
@@ -1728,6 +1983,8 @@ BattleItem *SavedBattleGame::createItemForTile(const std::string& type, Tile *ti
  */
 BattleItem *SavedBattleGame::createItemForTile(const RuleItem *rule, Tile *tile)
 {
+	// Note: this is allowed also in preview mode; for items spawned from map blocks (and friendly units spawned from such items)
+
 	BattleItem *item = new BattleItem(rule, getCurrentItemId());
 	if (tile)
 	{
@@ -1753,7 +2010,7 @@ BattleUnit *SavedBattleGame::createTempUnit(const Unit *rules, UnitFaction facti
 		const_cast<Unit*>(rules),
 		faction,
 		nextUnitId > 0 ? nextUnitId : getUnits()->back()->getId() + 1,
-		faction != FACTION_PLAYER ? getEnviroEffects() : nullptr,
+		getEnviroEffects(),
 		rules->getArmor(),
 		faction == FACTION_HOSTILE ? _rule->getStatAdjustment(getGeoscapeSave()->getDifficulty()) : nullptr,
 		getDepth());

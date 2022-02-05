@@ -129,6 +129,10 @@ void UnitWalkBState::think()
 			bool onScreenBoundary = (_unit->getVisible() && _parent->getMap()->getCamera()->isOnScreen(_unit->getPosition(), true, size, true));
 			_unit->keepWalking(_parent->getSave(), onScreenBoundary); // advances the phase
 			playMovementSound();
+			if (_parent->getSave()->isPreview())
+			{
+				_unit->resetTimeUnitsAndEnergy();
+			}
 		}
 		else if (!_falling)
 		{

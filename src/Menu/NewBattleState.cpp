@@ -199,6 +199,16 @@ NewBattleState::NewBattleState() : _craft(0), _selectType(NewBattleSelectType::M
 			}
 		}
 	}
+	// ignore, hardcoded
+	{
+		Collections::removeIf(
+			_missionTypes,
+			[](const std::string& p)
+			{
+				return p == RuleCraft::DEFAULT_CRAFT_DEPLOYMENT_PREVIEW;
+			}
+		);
+	}
 	_cbxMission->setOptions(_missionTypes, true);
 	_cbxMission->onChange((ActionHandler)&NewBattleState::cbxMissionChange);
 
@@ -525,6 +535,11 @@ void NewBattleState::initSave()
  */
 void NewBattleState::btnOkClick(Action *)
 {
+	if (_craft)
+	{
+		// just in case somebody manually edited battle.cfg
+		_craft->resetCustomDeployment();
+	}
 	save();
 	if (_missionTypes[_cbxMission->getSelected()] != "STR_BASE_DEFENSE" && _craft->getNumTotalUnits() == 0)
 	{
