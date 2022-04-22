@@ -388,7 +388,7 @@ void BattlescapeGame::handleAI(BattleUnit *unit)
 		auto* targetTile = _save->getTile(action.target);
 		if (targetTile)
 		{
-			_save->getPathfinding()->calculate(action.actor, action.target);//, _save->getTile(action.target)->getUnit());
+			_save->getPathfinding()->calculate(action.actor, action.target, BAM_NORMAL);
 		}
 		if (_save->getPathfinding()->getStartDirection() != -1)
 		{
@@ -932,6 +932,14 @@ void BattlescapeGame::checkForCasualties(const RuleDamageType *damageType, Battl
 				victim->getStatistics()->wasUnconcious = true;
 				noSound = true;
 				statePushNext(new UnitDieBState(this, (*j), getMod()->getDamageType(DT_NONE), noSound)); // no damage type used there
+			}
+			else
+			{
+				// piggyback of cleanup after script that change move type
+				if ((*j)->haveNoFloorBelow() && (*j)->getMovementType() != MT_FLY)
+				{
+					_parentState->getBattleGame()->getSave()->addFallingUnit(*j);
+				}
 			}
 		}
 	}
@@ -1551,7 +1559,7 @@ bool BattlescapeGame::handlePanickingUnit(BattleUnit *unit)
 			}
 			if (_save->getTile(ba.target)) // sanity check the tile.
 			{
-				_save->getPathfinding()->calculate(ba.actor, ba.target);
+				_save->getPathfinding()->calculate(ba.actor, ba.target, ba.getMoveType());
 				if (_save->getPathfinding()->getStartDirection() != -1) // sanity check the path.
 				{
 					statePushBack(new UnitWalkBState(this, ba));
@@ -1697,7 +1705,7 @@ void BattlescapeGame::primaryAction(Position pos)
 		{
 			int maxWaypoints = _currentAction.weapon->getRules()->getSprayWaypoints();
 			if ((int)_currentAction.waypoints.size() >= maxWaypoints ||
-				(_parentState->getGame()->isCtrlPressed(true) && _parentState->getGame()->isShiftPressed(true)) ||
+				(_save->isCtrlPressed(true) && _save->isShiftPressed(true)) ||
 				(!Options::battleConfirmFireMode && (int)_currentAction.waypoints.size() == maxWaypoints - 1))
 			{
 				// If we're firing early, pick one last waypoint.
@@ -1748,8 +1756,8 @@ void BattlescapeGame::primaryAction(Position pos)
 		}
 		else if (_currentAction.type == BA_AUTOSHOT &&
 			_currentAction.weapon->getRules()->getSprayWaypoints() > 0 &&
-			_parentState->getGame()->isCtrlPressed(true) &&
-			_parentState->getGame()->isShiftPressed(true) &&
+			_save->isCtrlPressed(true) &&
+			_save->isShiftPressed(true) &&
 			_currentAction.waypoints.empty()) // Starts the spray autoshot targeting
 		{
 			_currentAction.sprayTargeting = true;
@@ -1871,19 +1879,24 @@ void BattlescapeGame::primaryAction(Position pos)
 		}
 		else if (playableUnitSelected() /*&& !_parentState->hasScrolled()*/)
 		{
-			bool isCtrlPressed = _parentState->getGame()->isCtrlPressed(true);
-			bool isShiftPressed = _parentState->getGame()->isShiftPressed(true);
-			if (bPreviewed &&
-				(_currentAction.target != pos || (_save->getPathfinding()->isModifierUsed() != isCtrlPressed)))
+			bool isCtrlPressed = Options::strafe && _save->isCtrlPressed(true);
+			bool isAltPressed = Options::strafe && _save->isAltPressed(true);
+			bool isShiftPressed = _save->isShiftPressed(true);
+			if (bPreviewed && (
+				_currentAction.target != pos ||
+				_save->getPathfinding()->isModifierCtrlUsed() != isCtrlPressed ||
+				_save->getPathfinding()->isModifierAltUsed() != isAltPressed))
 			{
 				_save->getPathfinding()->removePreview();
 			}
 			_currentAction.target = pos;
-			_save->getPathfinding()->calculate(_currentAction.actor, _currentAction.target);
+			_save->getPathfinding()->calculate(_currentAction.actor, _currentAction.target, BAM_NORMAL); // precalucalte move
 
 			_currentAction.strafe = false;
 			_currentAction.run = false;
-			if (Options::strafe && isCtrlPressed)
+			_currentAction.sneak = false;
+
+			if (isCtrlPressed)
 			{
 				if (_save->getPathfinding()->getPath().size() > 1)
 				{
@@ -1894,6 +1907,17 @@ void BattlescapeGame::primaryAction(Position pos)
 					_currentAction.strafe = _save->getSelectedUnit()->getArmor()->allowsStrafing(_save->getSelectedUnit()->getArmor()->getSize() == 1);
 				}
 			}
+			else if (isAltPressed)
+			{
+				_currentAction.sneak = _save->getSelectedUnit()->getArmor()->allowsSneaking(_save->getSelectedUnit()->getArmor()->getSize() == 1);
+			}
+
+			//recalucate path after setting new move types
+			if (BAM_NORMAL != _currentAction.getMoveType())
+			{
+				_save->getPathfinding()->calculate(_currentAction.actor, _currentAction.target, _currentAction.getMoveType());
+			}
+
 			// if running or shifting, ignore spotted enemies (i.e. don't stop)
 			_currentAction.ignoreSpottedEnemies = (_currentAction.run && Mod::EXTENDED_RUNNING_COST) || isShiftPressed;
 
@@ -1924,7 +1948,7 @@ void BattlescapeGame::secondaryAction(Position pos)
 	//  -= turn to or open door =-
 	_currentAction.target = pos;
 	_currentAction.actor = _save->getSelectedUnit();
-	_currentAction.strafe = Options::strafe && _parentState->getGame()->isCtrlPressed(true) && _save->getSelectedUnit()->getTurretType() > -1;
+	_currentAction.strafe = Options::strafe && _save->isCtrlPressed(true) && _save->getSelectedUnit()->getTurretType() > -1;
 	statePushBack(new UnitTurnBState(this, _currentAction));
 }
 
@@ -2018,7 +2042,7 @@ void BattlescapeGame::moveUpDown(BattleUnit *unit, int dir)
 	{
 		kneel(_save->getSelectedUnit());
 	}
-	_save->getPathfinding()->calculate(_currentAction.actor, _currentAction.target);
+	_save->getPathfinding()->calculate(_currentAction.actor, _currentAction.target, _currentAction.getMoveType());
 	statePushBack(new UnitWalkBState(this, _currentAction));
 }
 
@@ -2679,7 +2703,7 @@ bool BattlescapeGame::takeItem(BattleItem* item, BattleAction *action)
 			if (slot != -1)
 			{
 				BattleActionCost cost{ unit };
-				cost.Time += Mod::EXTENDED_ITEM_RELOAD_COST ? i->getSlot()->getCost(weapon->getSlot()) : 0;
+				cost.Time += Mod::EXTENDED_ITEM_RELOAD_COST ? i->getMoveToCost(weapon->getSlot()) : 0;
 				cost.Time += weapon->getRules()->getTULoad(slot);
 				if (cost.haveTU() && !weapon->getAmmoForSlot(slot))
 				{
@@ -2695,7 +2719,7 @@ bool BattlescapeGame::takeItem(BattleItem* item, BattleAction *action)
 	auto equipItem = [&unit](RuleInventory *slot, BattleItem* i)
 	{
 		BattleActionCost cost{ unit };
-		cost.Time += i->getSlot()->getCost(slot);
+		cost.Time += i->getMoveToCost(slot);
 		if (cost.haveTU() && unit->fitItemToInventory(slot, i))
 		{
 			cost.spendTU();

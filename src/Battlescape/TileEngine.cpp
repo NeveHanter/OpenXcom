@@ -475,7 +475,7 @@ void TileEngine::calculateLighting(LightLayers layer, Position position, int eve
 				cache.height = -tile->getTerrainLevel();
 				if (mapData)
 				{
-					if (mapData->getTUCost(MT_WALK) == 255)
+					if (mapData->getTUCost(MT_WALK) == Pathfinding::INVALID_MOVE_COST)
 					{
 						cache.height = 24;
 					}
@@ -4466,7 +4466,7 @@ void TileEngine::itemDropInventory(Tile *t, BattleUnit *unit, bool unprimeItems,
 /**
  * Move item to other place in inventory or ground.
  */
-void TileEngine::itemMoveInventory(Tile *t, BattleUnit *unit, BattleItem *item, RuleInventory *slot, int x, int y)
+void TileEngine::itemMoveInventory(Tile *t, BattleUnit *unit, BattleItem *item, const RuleInventory *slot, int x, int y)
 {
 	// Handle dropping from/to ground.
 	if (slot != item->getSlot())
@@ -4741,7 +4741,7 @@ bool TileEngine::validTerrainMeleeRange(BattleAction* action)
 					if (dir == 4 /*south*/ && bigWall != Pathfinding::BIGWALLSOUTH && bigWall != Pathfinding::BIGWALLEASTANDSOUTH) return false;
 					if (dir == 6 /*west */ && bigWall != Pathfinding::BIGWALLWEST  && bigWall != Pathfinding::BIGWALLWESTANDNORTH) return false;
 				}
-				if (tp != O_OBJECT && !obj->isDoor() && !obj->isUFODoor() && tt->getTUCost(tp, MT_WALK) < 255)
+				if (tp != O_OBJECT && !obj->isDoor() && !obj->isUFODoor() && tt->getTUCost(tp, MT_WALK) != Pathfinding::INVALID_MOVE_COST)
 				{
 					// it is possible to walk through this (rubble) wall... no need to attack it
 					return false;
@@ -4894,7 +4894,7 @@ bool TileEngine::validateThrow(BattleAction &action, Position originVoxel, Posit
 	if (action.type == BA_THROW
 		&& targetTile
 		&& targetTile->getMapData(O_OBJECT)
-		&& targetTile->getMapData(O_OBJECT)->getTUCost(MT_WALK) == 255
+		&& targetTile->getMapData(O_OBJECT)->getTUCost(MT_WALK) == Pathfinding::INVALID_MOVE_COST
 		&& !(targetTile->isBigWall()
 		&& (targetTile->getMapData(O_OBJECT)->getBigWall()<1
 		|| targetTile->getMapData(O_OBJECT)->getBigWall()>3)))
@@ -5206,7 +5206,7 @@ bool TileEngine::isPositionValidForUnit(Position &position, BattleUnit *unit, bo
 				Position positionToCheck = (*i) + Position(x, y, 0);
 				Tile* tileToCheck = _save->getTile(positionToCheck);
 				if (!tileToCheck || (tileToCheck->getUnit() && tileToCheck->getUnit() != unit) ||
-					tileToCheck->getTUCost(O_OBJECT, unit->getMovementType()) == 255 ||
+					tileToCheck->getTUCost(O_OBJECT, unit->getMovementType()) == Pathfinding::INVALID_MOVE_COST ||
 					(tileToCheck->getMapData(O_OBJECT) && tileToCheck->getMapData(O_OBJECT)->getBigWall() && tileToCheck->getMapData(O_OBJECT)->getBigWall() <= 3))
 				{
 					passedCheck = false;
@@ -5217,10 +5217,10 @@ bool TileEngine::isPositionValidForUnit(Position &position, BattleUnit *unit, bo
 		// Extra test for large units
 		if (passedCheck && unitSize > 1)
 		{
-			_save->getPathfinding()->setUnit(unit);
+			_save->getPathfinding()->setUnit(unit); //TODO: remove as was required by `isBlockedDirection`
 			for (int dir = 2; dir <= 4; ++dir)
 			{
-				if (_save->getPathfinding()->isBlockedDirection(_save->getTile(*i), dir, 0))
+				if (_save->getPathfinding()->isBlockedDirection(unit, _save->getTile(*i), dir))
 				{
 					passedCheck = false;
 				}

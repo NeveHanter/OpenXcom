@@ -1407,9 +1407,7 @@ void BattlescapeState::btnKneelClick(Action *)
 			// update any path preview when unit kneels
 			if (_battleGame->getPathfinding()->isPathPreviewed())
 			{
-				_battleGame->getPathfinding()->calculate(_battleGame->getCurrentAction()->actor, _battleGame->getCurrentAction()->target);
-				_battleGame->getPathfinding()->removePreview();
-				_battleGame->getPathfinding()->previewPath();
+				_battleGame->getPathfinding()->refreshPath();
 			}
 		}
 	}
@@ -2070,8 +2068,7 @@ void BattlescapeState::btnReserveClick(Action *action)
 		// update any path preview
 		if (_battleGame->getPathfinding()->isPathPreviewed())
 		{
-			_battleGame->getPathfinding()->removePreview();
-			_battleGame->getPathfinding()->previewPath();
+			_battleGame->getPathfinding()->refreshPath();
 		}
 	}
 }
@@ -2333,17 +2330,14 @@ void BattlescapeState::updateSoldierInfo(bool checkFOV)
 			customBg->blitNShade(_rank, 0, 0);
 
 			// show avatar
-			auto defaultPrefix = soldier->getArmor()->getLayersDefaultPrefix();
-			Armor *customArmor = nullptr;
+			Armor *customArmor = soldier->getArmor();
 			if (!soldier->getRules()->getArmorForAvatar().empty())
 			{
 				customArmor = _game->getMod()->getArmor(soldier->getRules()->getArmorForAvatar());
-				defaultPrefix = customArmor->getLayersDefaultPrefix();
 			}
-			if (!defaultPrefix.empty())
+			if (customArmor->hasLayersDefinition())
 			{
-				auto layers = soldier->getArmorLayers(customArmor);
-				for (auto layer : layers)
+				for (const auto& layer : soldier->getArmorLayers(customArmor))
 				{
 					auto surf = _game->getMod()->getSurface(layer, true);
 
@@ -3206,7 +3200,7 @@ void BattlescapeState::saveAIMap()
 			r.x = x * r.w;
 			r.y = y * r.h;
 
-			if (t->getTUCost(O_FLOOR, MT_FLY) != 255 && t->getTUCost(O_OBJECT, MT_FLY) != 255)
+			if (t->getTUCost(O_FLOOR, MT_FLY) != Pathfinding::INVALID_MOVE_COST && t->getTUCost(O_OBJECT, MT_FLY) != Pathfinding::INVALID_MOVE_COST)
 			{
 				SDL_FillRect(img, &r, SDL_MapRGB(img->format, 255, 0, 0x20));
 				characterRGBA(img, r.x, r.y,'*' , 0x7f, 0x7f, 0x7f, 0x7f);
@@ -3241,12 +3235,12 @@ void BattlescapeState::saveAIMap()
 				if (z > 0 && !t->hasNoFloor(_save)) break; // no seeing through floors
 			}
 
-			if (t->getMapData(O_NORTHWALL) && t->getMapData(O_NORTHWALL)->getTUCost(MT_FLY) == 255)
+			if (t->getMapData(O_NORTHWALL) && t->getMapData(O_NORTHWALL)->getTUCost(MT_FLY) == Pathfinding::INVALID_MOVE_COST)
 			{
 				lineRGBA(img, r.x, r.y, r.x+r.w, r.y, 0x50, 0x50, 0x50, 255);
 			}
 
-			if (t->getMapData(O_WESTWALL) && t->getMapData(O_WESTWALL)->getTUCost(MT_FLY) == 255)
+			if (t->getMapData(O_WESTWALL) && t->getMapData(O_WESTWALL)->getTUCost(MT_FLY) == Pathfinding::INVALID_MOVE_COST)
 			{
 				lineRGBA(img, r.x, r.y, r.x, r.y+r.h, 0x50, 0x50, 0x50, 255);
 			}
@@ -3738,8 +3732,7 @@ void BattlescapeState::btnReserveKneelClick(Action *action)
 		// update any path preview
 		if (_battleGame->getPathfinding()->isPathPreviewed())
 		{
-			_battleGame->getPathfinding()->removePreview();
-			_battleGame->getPathfinding()->previewPath();
+			_battleGame->getPathfinding()->refreshPath();
 		}
 	}
 }
