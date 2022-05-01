@@ -173,9 +173,9 @@ void ModListState::cbxMasterChange(Action *)
 
 	// when changing a master mod, check if it requires OXCE
 	{
-		if (!masterModInfo->isVersionOk())
+		if (!masterModInfo->isEngineOk())
 		{
-			_game->pushState(new ModConfirmExtendedState(this, true, masterModInfo));
+			_game->pushState(new ModConfirmExtendedState(this, masterModInfo));
 			return;
 		}
 	}
@@ -261,9 +261,9 @@ void ModListState::lstModsClick(Action *action)
 	if (!mod.second)
 	{
 		const ModInfo *modInfo = &Options::getModInfos().at(mod.first);
-		if (!modInfo->isVersionOk())
+		if (!modInfo->isEngineOk())
 		{
-			_game->pushState(new ModConfirmExtendedState(this, false, modInfo));
+			_game->pushState(new ModConfirmExtendedState(this, modInfo));
 			return;
 		}
 	}
