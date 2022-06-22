@@ -83,7 +83,6 @@ OPT bool oxceAutoSell;
 OPT int oxceAutoNightVisionThreshold;
 OPT bool oxceRememberDisabledCraftWeapons;
 OPT bool oxceEnableOffCentreShooting;
-OPT bool oxceShowEnergyInPathReview;
 
 // OXCE hidden, accessible only via options.cfg
 OPT bool oxceFatFingerLinks;
