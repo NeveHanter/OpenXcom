@@ -812,7 +812,7 @@ void BattlescapeGenerator::run()
 
 	generateMap(script, ruleDeploy->getCustomUfoName());
 
-	if (isPreview)
+	if (isPreview && ruleDeploy->isHidden())
 	{
 		_save->revealMap();
 	}
@@ -2384,7 +2384,7 @@ bool BattlescapeGenerator::placeUnitNearFriend(BattleUnit *unit)
 			if (k->getFaction() == unit->getFaction() && k->getPosition() != TileEngine::invalid && k->getArmor()->getSize() >= unit->getArmor()->getSize())
 			{
 				entryPoint = k->getPosition();
-				largeUnit = (k->getArmor()->getSize() != 1);
+				largeUnit = k->isBigUnit();
 			}
 			--tries;
 		}
