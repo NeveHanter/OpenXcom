@@ -427,13 +427,20 @@ void TileEngine::calculateSunShading(MapSubset gs)
 	);
 }
 
+/// amount of light a fire generates from tile
+const int fireLightPower = 15;
+
+/// amount of light a fire generates from unit
+const int unitFireLightPower = 15;
+
+///  amount of light a fire generates from stunned unit
+const int unitFireLightPowerStunned = 10;
+
 /**
   * Recalculates lighting for the terrain: fire.
   */
 void TileEngine::calculateTerrainBackground(MapSubset gs)
 {
-	const int fireLightPower = 15; // amount of light a fire generates
-
 	// add lighting of fire
 	iterateTiles(
 		_save,
@@ -462,7 +469,7 @@ void TileEngine::calculateTerrainBackground(MapSubset gs)
 			// fires
 			if (tile->getFire())
 			{
-				currLight = std::max(currLight, fireLightPower);
+				currLight = std::max(currLight, unitFireLightPower);
 			}
 
 			if (currLight >= getMaxStaticLightDistance())
@@ -487,11 +494,17 @@ void TileEngine::calculateTerrainItems(MapSubset gs)
 		{
 			auto currLight = 0;
 
-			for (BattleItem *it : *tile->getInventory())
+			for (const BattleItem *it : *tile->getInventory())
 			{
 				if (it->getGlow())
 				{
 					currLight = std::max(currLight, it->getGlowRange());
+				}
+
+				auto u = it->getUnit();
+				if (u && u->getFire())
+				{
+					currLight = std::max(currLight, unitFireLightPowerStunned);
 				}
 			}
 
@@ -509,8 +522,6 @@ void TileEngine::calculateTerrainItems(MapSubset gs)
   */
 void TileEngine::calculateUnitLighting(MapSubset gs)
 {
-	const int fireLightPower = 15; // amount of light a fire generates
-
 	for (BattleUnit *unit : *_save->getUnits())
 	{
 		if (unit->isOut())
@@ -524,18 +535,26 @@ void TileEngine::calculateUnitLighting(MapSubset gs)
 		{
 			currLight = std::max(currLight, unit->getArmor()->getPersonalLight());
 		}
-		BattleItem *handWeapons[] = { unit->getLeftHandWeapon(), unit->getRightHandWeapon() };
-		for (BattleItem *w : handWeapons)
+		const BattleItem *handWeapons[] = { unit->getLeftHandWeapon(), unit->getRightHandWeapon() };
+		for (const BattleItem *w : handWeapons)
 		{
-			if (w && w->getGlow())
+			if (!w) continue;
+
+			if (w->getGlow())
 			{
 				currLight = std::max(currLight, w->getGlowRange());
+			}
+
+			auto u = w->getUnit();
+			if (u && u->getFire())
+			{
+				currLight = std::max(currLight, unitFireLightPowerStunned);
 			}
 		}
 		// add lighting of units on fire
 		if (unit->getFire())
 		{
-			currLight = std::max(currLight, fireLightPower);
+			currLight = std::max(currLight, unitFireLightPower);
 		}
 
 		if (currLight >= getMaxDynamicLightDistance())
