@@ -418,7 +418,7 @@ void InventoryState::init()
 		if (_reloadUnit)
 		{
 			// Step 0: update unit's armor
-			unit->updateArmorFromSoldier(_game->getMod(), s, s->getArmor(), _battleGame->getDepth(), false);
+			unit->updateArmorFromSoldier(_game->getMod(), s, s->getArmor(), _battleGame->getDepth(), false, nullptr);
 
 			// Step 1: remember the unit's equipment (incl. loaded fixed items)
 			_clearInventoryTemplate(_tempInventoryTemplate);
@@ -1034,7 +1034,10 @@ void InventoryState::btnOkClick(Action *)
 	_game->popState();
 	if (!_tu)
 	{
-		saveEquipmentLayout();
+		if (_base || !Options::oxceAlternateCraftEquipmentManagement)
+		{
+			saveEquipmentLayout();
+		}
 		if (_parent)
 		{
 			_battleGame->startFirstTurn();
