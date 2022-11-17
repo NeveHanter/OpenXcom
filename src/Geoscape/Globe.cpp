@@ -19,7 +19,6 @@
 #define _USE_MATH_DEFINES
 #include "Globe.h"
 #include <cmath>
-#include <algorithm>
 #include "../fmath.h"
 #include "../Engine/Action.h"
 #include "../Engine/SurfaceSet.h"
@@ -36,7 +35,6 @@
 #include "../Savegame/Country.h"
 #include "../Mod/RuleCountry.h"
 #include "../Interface/Text.h"
-#include "../Engine/LocalizedText.h"
 #include "../Mod/RuleRegion.h"
 #include "../Savegame/Region.h"
 #include "../Mod/City.h"
