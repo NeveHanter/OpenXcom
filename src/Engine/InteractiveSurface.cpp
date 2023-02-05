@@ -275,8 +275,8 @@ void InteractiveSurface::unpress(State *state)
  */
 void InteractiveSurface::mousePress(Action *action, State *state)
 {
-	std::map<Uint8, ActionHandler>::iterator allHandler = _press.find(0);
-	std::map<Uint8, ActionHandler>::iterator oneHandler = _press.find(action->getDetails()->button.button);
+	auto allHandler = _press.find(0);
+	auto oneHandler = _press.find(action->getDetails()->button.button);
 	if (allHandler != _press.end())
 	{
 		ActionHandler handler = allHandler->second;
@@ -298,8 +298,8 @@ void InteractiveSurface::mousePress(Action *action, State *state)
  */
 void InteractiveSurface::mouseRelease(Action *action, State *state)
 {
-	std::map<Uint8, ActionHandler>::iterator allHandler = _release.find(0);
-	std::map<Uint8, ActionHandler>::iterator oneHandler = _release.find(action->getDetails()->button.button);
+	auto allHandler = _release.find(0);
+	auto oneHandler = _release.find(action->getDetails()->button.button);
 	if (allHandler != _release.end())
 	{
 		ActionHandler handler = allHandler->second;
@@ -321,8 +321,8 @@ void InteractiveSurface::mouseRelease(Action *action, State *state)
  */
 void InteractiveSurface::mouseClick(Action *action, State *state)
 {
-	std::map<Uint8, ActionHandler>::iterator allHandler = _click.find(0);
-	std::map<Uint8, ActionHandler>::iterator oneHandler = _click.find(action->getDetails()->button.button);
+	auto allHandler = _click.find(0);
+	auto oneHandler = _click.find(action->getDetails()->button.button);
 	if (allHandler != _click.end())
 	{
 		ActionHandler handler = allHandler->second;
@@ -389,8 +389,8 @@ void InteractiveSurface::mouseOut(Action *action, State *state)
  */
 void InteractiveSurface::keyboardPress(Action *action, State *state)
 {
-	std::map<SDL_Keycode, ActionHandler>::iterator allHandler = _keyPress.find((SDL_Keycode)SDLK_ANY);
-	std::map<SDL_Keycode, ActionHandler>::iterator oneHandler = _keyPress.find(action->getDetails()->key.keysym.sym);
+	auto allHandler = _keyPress.find((SDL_Keycode)SDLK_ANY);
+	auto oneHandler = _keyPress.find(action->getDetails()->key.keysym.sym);
 	if (allHandler != _keyPress.end())
 	{
 		ActionHandler handler = allHandler->second;
@@ -414,8 +414,8 @@ void InteractiveSurface::keyboardPress(Action *action, State *state)
  */
 void InteractiveSurface::keyboardRelease(Action *action, State *state)
 {
-	std::map<SDL_Keycode, ActionHandler>::iterator allHandler = _keyRelease.find((SDL_Keycode)SDLK_ANY);
-	std::map<SDL_Keycode, ActionHandler>::iterator oneHandler = _keyRelease.find(action->getDetails()->key.keysym.sym);
+	auto allHandler = _keyRelease.find((SDL_Keycode)SDLK_ANY);
+	auto oneHandler = _keyRelease.find(action->getDetails()->key.keysym.sym);
 	if (allHandler != _keyRelease.end())
 	{
 		ActionHandler handler = allHandler->second;

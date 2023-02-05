@@ -62,9 +62,9 @@ State::State() : _screen(true), _soundPlayed(false), _modal(0), _ruleInterface(0
  */
 State::~State()
 {
-	for (std::vector<Surface*>::iterator i = _surfaces.begin(); i < _surfaces.end(); ++i)
+	for (auto* surface : _surfaces)
 	{
-		delete *i;
+		delete surface;
 	}
 }
 
@@ -127,8 +127,8 @@ void State::setInterface(const std::string& category, bool alterPal, SavedBattle
  */
 void State::setWindowBackground(Window *window, const std::string &s)
 {
-	auto bgImageName = _game->getMod()->getInterface(s)->getBackgroundImage();
-	auto bgImage = _game->getMod()->getSurface(bgImageName);
+	auto& bgImageName = _game->getMod()->getInterface(s)->getBackgroundImage();
+	auto* bgImage = _game->getMod()->getSurface(bgImageName);
 	window->setBackground(bgImage);
 }
 
@@ -283,9 +283,9 @@ void State::init()
 		}
 	}
 
-	for (std::vector<Surface*>::iterator i = _surfaces.begin(); i != _surfaces.end(); ++i)
+	for (auto* surface : _surfaces)
 	{
-		Window* window = dynamic_cast<Window*>(*i);
+		Window* window = dynamic_cast<Window*>(surface);
 		if (window)
 		{
 			if (muteWindowPopupSound)
@@ -307,8 +307,10 @@ void State::init()
  */
 void State::think()
 {
-	for (std::vector<Surface*>::iterator i = _surfaces.begin(); i != _surfaces.end(); ++i)
-		(*i)->think();
+	for (auto* surface : _surfaces)
+	{
+		surface->think();
+	}
 }
 
 /**
@@ -339,8 +341,10 @@ void State::handle(Action *action)
  */
 void State::blit()
 {
-	for (std::vector<Surface*>::iterator i = _surfaces.begin(); i != _surfaces.end(); ++i)
-		(*i)->blit(_game->getScreen()->getSurface());
+	for (auto* surface : _surfaces)
+	{
+		surface->blit(_game->getScreen()->getSurface());
+	}
 }
 
 /**
@@ -348,8 +352,10 @@ void State::blit()
  */
 void State::hideAll()
 {
-	for (std::vector<Surface*>::iterator i = _surfaces.begin(); i != _surfaces.end(); ++i)
-		(*i)->setHidden(true);
+	for (auto* surface : _surfaces)
+	{
+		surface->setHidden(true);
+	}
 }
 
 /**
@@ -357,8 +363,10 @@ void State::hideAll()
  */
 void State::showAll()
 {
-	for (std::vector<Surface*>::iterator i = _surfaces.begin(); i != _surfaces.end(); ++i)
-		(*i)->setHidden(false);
+	for (auto* surface : _surfaces)
+	{
+		surface->setHidden(false);
+	}
 }
 
 /**
@@ -367,9 +375,9 @@ void State::showAll()
  */
 void State::resetAll()
 {
-	for (std::vector<Surface*>::iterator i = _surfaces.begin(); i != _surfaces.end(); ++i)
+	for (auto* surface : _surfaces)
 	{
-		InteractiveSurface *s = dynamic_cast<InteractiveSurface*>(*i);
+		InteractiveSurface *s = dynamic_cast<InteractiveSurface*>(surface);
 		if (s != 0)
 		{
 			s->unpress(this);
@@ -437,10 +445,10 @@ LocalizedText State::tr(const std::string &id, SoldierGender gender) const
  */
 void State::centerAllSurfaces()
 {
-	for (std::vector<Surface*>::iterator i = _surfaces.begin(); i != _surfaces.end(); ++i)
+	for (auto* surface : _surfaces)
 	{
-		(*i)->setX((*i)->getX() + _game->getScreen()->getDX());
-		(*i)->setY((*i)->getY() + _game->getScreen()->getDY());
+		surface->setX(surface->getX() + _game->getScreen()->getDX());
+		surface->setY(surface->getY() + _game->getScreen()->getDY());
 	}
 }
 
@@ -449,9 +457,9 @@ void State::centerAllSurfaces()
  */
 void State::lowerAllSurfaces()
 {
-	for (std::vector<Surface*>::iterator i = _surfaces.begin(); i != _surfaces.end(); ++i)
+	for (auto* surface : _surfaces)
 	{
-		(*i)->setY((*i)->getY() + _game->getScreen()->getDY() / 2);
+		surface->setY(surface->getY() + _game->getScreen()->getDY() / 2);
 	}
 }
 
@@ -466,21 +474,21 @@ void State::applyBattlescapeTheme(const std::string& category)
 	{
 		altBg = "TAC00.SCR";
 	}
-	for (std::vector<Surface*>::iterator i = _surfaces.begin(); i != _surfaces.end(); ++i)
+	for (auto* surface : _surfaces)
 	{
-		(*i)->setColor(element->color);
-		(*i)->setHighContrast(true);
-		Window* window = dynamic_cast<Window*>(*i);
+		surface->setColor(element->color);
+		surface->setHighContrast(true);
+		Window* window = dynamic_cast<Window*>(surface);
 		if (window)
 		{
 			window->setBackground(_game->getMod()->getSurface(altBg));
 		}
-		TextList* list = dynamic_cast<TextList*>(*i);
+		TextList* list = dynamic_cast<TextList*>(surface);
 		if (list)
 		{
 			list->setArrowColor(element->border);
 		}
-		ComboBox *combo = dynamic_cast<ComboBox*>(*i);
+		ComboBox *combo = dynamic_cast<ComboBox*>(surface);
 		if (combo)
 		{
 			combo->setArrowColor(element->border);
@@ -493,15 +501,15 @@ void State::applyBattlescapeTheme(const std::string& category)
  */
 void State::redrawText()
 {
-	for (std::vector<Surface*>::iterator i = _surfaces.begin(); i != _surfaces.end(); ++i)
+	for (auto* surface : _surfaces)
 	{
-		Text* text = dynamic_cast<Text*>(*i);
-		TextButton* button = dynamic_cast<TextButton*>(*i);
-		TextEdit* edit = dynamic_cast<TextEdit*>(*i);
-		TextList* list = dynamic_cast<TextList*>(*i);
+		Text* text = dynamic_cast<Text*>(surface);
+		TextButton* button = dynamic_cast<TextButton*>(surface);
+		TextEdit* edit = dynamic_cast<TextEdit*>(surface);
+		TextList* list = dynamic_cast<TextList*>(surface);
 		if (text || button || edit || list)
 		{
-			(*i)->draw();
+			surface->draw();
 		}
 	}
 }
@@ -617,10 +625,10 @@ void State::resize(int &dX, int &dY)
  */
 void State::recenter(int dX, int dY)
 {
-	for (std::vector<Surface*>::const_iterator i = _surfaces.begin(); i != _surfaces.end(); ++i)
+	for (auto* surface : _surfaces)
 	{
-		(*i)->setX((*i)->getX() + dX / 2);
-		(*i)->setY((*i)->getY() + dY / 2);
+		surface->setX(surface->getX() + dX / 2);
+		surface->setY(surface->getY() + dY / 2);
 	}
 }
 
