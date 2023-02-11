@@ -1199,7 +1199,7 @@ void DebriefingState::prepareDebriefing()
 
 	if (!base && save->isIronman())
 	{
-		throw Exception("Your save is corrupted. Try asking someone on the Openxcom forum/discord to fix it for you.");
+		throw Exception("Your save is corrupted. Try asking someone on the Openxcom forum to fix it for you.");
 	}
 
 	// mission site disappears (even when you abort)
@@ -2161,7 +2161,8 @@ void DebriefingState::prepareDebriefing()
  */
 void DebriefingState::reequipCraft(Base *base, Craft *craft, bool vehicleItemsCanBeDestroyed)
 {
-	for (const auto& pair : *craft->getItems()->getContents())
+	std::map<std::string, int> craftItemsCopy = *craft->getItems()->getContents();
+	for (const auto& pair : craftItemsCopy)
 	{
 		int qty = base->getStorageItems()->getItem(pair.first);
 		if (qty >= pair.second)
