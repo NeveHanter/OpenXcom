@@ -380,7 +380,7 @@ enum Axis : signed char
 /**
  * Index to component of Box
  */
-enum BoxAxis : char
+enum BoxAxis : signed char
 {
 	B_X = X,
 	B_Y = Y,
