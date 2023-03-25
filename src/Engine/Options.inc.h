@@ -49,7 +49,7 @@ keyBattleCenterEnemy1, keyBattleCenterEnemy2, keyBattleCenterEnemy3, keyBattleCe
 keyBattleCenterEnemy9, keyBattleCenterEnemy10, keyBattleVoxelView, keyBattleZeroTUs, keyInvCreateTemplate, keyInvApplyTemplate, keyInvClear, keyInvAutoEquip;
 
 // Extra hotkeys (OXCE)
-OPT SDL_Keycode keyGeoDailyPilotExperience, keyGeoUfoTracker, keyGeoTechTreeViewer, keyGeoGlobalResearch, keyGeoGlobalProduction,
+OPT SDL_Keycode keyGeoDailyPilotExperience, keyGeoUfoTracker, keyGeoTechTreeViewer, keyGeoGlobalResearch, keyGeoGlobalProduction, keyGeoGlobalAlienContainment,
 	keyGraphsZoomIn, keyGraphsZoomOut,
 	keyToggleQuickSearch,
 	keyCraftLoadoutSave, keyCraftLoadoutLoad,
@@ -73,6 +73,8 @@ OPT SDL_Keycode keyBasescapeBuildNewBase, keyBasescapeBaseInfo, keyBasescapeSold
 // OXCE, accessible via GUI
 OPT bool oxceUpdateCheck;
 OPT int autosaveSlots;
+OPT bool oxceManualPromotions;
+OPT bool oxceAutomaticPromotions;
 
 OPT bool oxceLinks;
 OPT bool oxceAlternateCraftEquipmentManagement;
@@ -127,6 +129,7 @@ OPT bool oxceDisableProductionDependencyTree;
 OPT bool oxceDisableHitLog;
 OPT bool oxceDisableAlienInventory;
 OPT bool oxceDisableInventoryTuCost;
+OPT bool oxceShowBaseNameInPopups;
 
 // System-specific options
 OPT bool swipeToTurn, holdToTurn;
