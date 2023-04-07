@@ -112,7 +112,11 @@ void InteractiveSurface::handle(Action *action, State *state)
 
 	if (action->getDetails()->type == SDL_MOUSEBUTTONUP || action->getDetails()->type == SDL_MOUSEBUTTONDOWN)
 	{
-		action->setMouseAction(action->getDetails()->button.x, action->getDetails()->button.y, getX(), getY());
+		if (action->getDetails()->button.button != SDL_BUTTON_WHEELDOWN && action->getDetails()->button.button != SDL_BUTTON_WHEELUP)
+		{
+			// Ignore mouse wheel events as these report 0, 0 positions
+			action->setMouseAction(action->getDetails()->button.x, action->getDetails()->button.y, getX(), getY());
+		}
 	}
 	else if (action->getDetails()->type == SDL_MOUSEMOTION)
 	{

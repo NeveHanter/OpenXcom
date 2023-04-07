@@ -366,7 +366,10 @@ void ComboBox::handle(Action *action, State *state)
 		(action->getAbsoluteXMouse() < getX() || action->getAbsoluteXMouse() >= getX() + getWidth() ||
 		 action->getAbsoluteYMouse() < topY || action->getAbsoluteYMouse() >= topY + getHeight() + _window->getHeight()))
 	{
-		toggle(false, false);
+		if (action->getDetails()->button.button != SDL_BUTTON_WHEELDOWN && action->getDetails()->button.button != SDL_BUTTON_WHEELUP)
+		{
+			toggle(false, false);
+		}
 	}
 	if (_toggled)
 	{

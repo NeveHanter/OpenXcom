@@ -192,7 +192,7 @@ if ( BUILD_PACKAGE )
     set ( CPACK_PACKAGE_FILE_NAME "Extended-${CPACK_PACKAGE_VERSION}-${TARGET_PLATFORM}" )
   else ()
     set ( CPACK_PACKAGE_FILE_NAME "Extended-${CPACK_PACKAGE_VERSION}-unknown" )
-    message ( WARNING "Missing OPENXCOM_TARGET for package naming. Please set it." )
+#    message ( WARNING "Missing OPENXCOM_TARGET for package naming. Please set it." )
   endif()
 
   # DEB-specific -- set -DCPACK_GENERATOR=DEB
